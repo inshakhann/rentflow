@@ -1,107 +1,53 @@
 :root {
-  --color-navy: #1B2A4A;
-  --color-navy-light: #2E4070;
-  --color-teal: #0EA5E9;
-  --color-teal-light: #BAE6FD;
-  --color-amber: #F59E0B;
-  --color-amber-light: #FEF3C7;
-  --color-red: #EF4444;
-  --color-red-light: #FEE2E2;
-  --color-green: #10B981;
-  --color-green-light: #D1FAE5;
-  --color-white: #FFFFFF;
-  --color-light: #F8FAFC;
-  --color-gray-100: #F8FAFC;
-  --color-gray-200: #E2E8F0;
+  --color-navy: #14213d;
+  --color-navy-light: #213b68;
+  --color-teal: #0f8b8d;
+  --color-teal-light: #d5f5f5;
+  --color-amber: #f59e0b;
+  --color-amber-light: #fff3da;
+  --color-red: #dc2626;
+  --color-red-light: #fee2e2;
+  --color-green: #059669;
+  --color-green-light: #d1fae5;
+  --color-white: #ffffff;
+  --color-light: #f7f8fc;
+  --color-gray-100: #f5f7fb;
+  --color-gray-200: #e5eaf3;
   --color-gray-700: #334155;
-  --color-body-bg: #F8FAFC;
-  --color-card-bg: #FFFFFF;
-  --color-text: #334155;
+
+  --color-body-bg: #f5f7fb;
+  --color-card-bg: #ffffff;
+  --color-text: #1f2937;
   --color-text-muted: #64748b;
-  --color-border: #E2E8F0;
+  --color-border: #dbe3ef;
+
+  --shadow-sm: 0 4px 14px rgba(2, 12, 27, 0.06);
+  --shadow-md: 0 10px 30px rgba(2, 12, 27, 0.08);
+  --shadow-lg: 0 24px 60px rgba(2, 12, 27, 0.14);
 }
 
-/* ── Dark Mode Overrides ── */
 [data-theme="dark"] {
-  --color-navy: #e2e8f0;
-  --color-navy-light: #94a3b8;
-  --color-teal-light: rgba(14, 165, 233, 0.15);
-  --color-amber-light: rgba(245, 158, 11, 0.15);
-  --color-red-light: rgba(239, 68, 68, 0.15);
-  --color-green-light: rgba(16, 185, 129, 0.15);
-  --color-white: #1e1e2e;
-  --color-light: #181825;
-  --color-gray-100: #1e1e2e;
-  --color-gray-200: #313244;
-  --color-gray-700: #cdd6f4;
-  --color-body-bg: #11111b;
-  --color-card-bg: #1e1e2e;
-  --color-text: #cdd6f4;
-  --color-text-muted: #a6adc8;
-  --color-border: #313244;
-}
+  --color-navy: #dbeafe;
+  --color-navy-light: #9ab0d8;
+  --color-teal: #40c4c6;
+  --color-teal-light: rgba(64, 196, 198, 0.2);
+  --color-amber-light: rgba(245, 158, 11, 0.2);
+  --color-red-light: rgba(220, 38, 38, 0.2);
+  --color-green-light: rgba(5, 150, 105, 0.2);
 
-[data-theme="dark"] body,
-[data-theme="dark"] .main-content {
-  background-color: var(--color-body-bg) !important;
-  color: var(--color-text);
-}
+  --color-white: #151d31;
+  --color-light: #11182a;
+  --color-gray-100: #11182a;
+  --color-gray-200: #1c2742;
+  --color-gray-700: #d1d9e8;
 
-[data-theme="dark"] .sidebar {
-  background-color: #181825 !important;
-}
+  --color-body-bg: #0b1220;
+  --color-card-bg: #151d31;
+  --color-text: #d8e2f3;
+  --color-text-muted: #95a7c6;
+  --color-border: #233150;
 
-[data-theme="dark"] .top-header {
-  background-color: var(--color-card-bg) !important;
-  border-bottom-color: var(--color-border) !important;
-}
-
-[data-theme="dark"] .form-card,
-[data-theme="dark"] .stat-card,
-[data-theme="dark"] .card,
-[data-theme="dark"] .glass-card,
-[data-theme="dark"] .modal-content {
-  background-color: var(--color-card-bg) !important;
-  color: var(--color-text) !important;
-  border-color: var(--color-border) !important;
-}
-
-[data-theme="dark"] .table {
-  background-color: var(--color-card-bg) !important;
-  color: var(--color-text) !important;
-}
-
-[data-theme="dark"] .table thead th {
-  background-color: #313244 !important;
-  color: #cdd6f4 !important;
-}
-
-[data-theme="dark"] .form-control,
-[data-theme="dark"] .form-select {
-  background-color: #313244 !important;
-  color: #cdd6f4 !important;
-  border-color: #45475a !important;
-}
-
-[data-theme="dark"] .text-navy {
-  color: #cdd6f4 !important;
-}
-
-[data-theme="dark"] .text-muted {
-  color: var(--color-text-muted) !important;
-}
-
-[data-theme="dark"] .bg-white,
-[data-theme="dark"] .bg-light {
-  background-color: var(--color-card-bg) !important;
-}
-
-[data-theme="dark"] .alert {
-  background-color: var(--color-card-bg) !important;
-  border-color: var(--color-border) !important;
-}
-
-[data-theme="dark"] .border-bottom,
-[data-theme="dark"] .border {
-  border-color: var(--color-border) !important;
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
 }

@@ -4,11 +4,21 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject IJSRuntime JSRuntime
 @inject NotificationService NotificationService
+@implements IDisposable
 
-<div class="app-container">
-    <div class="sidebar">
-        <div class="p-3">
-            <h4 class="text-white mb-4">RentFlow</h4>
+<div class="rf-shell">
+    <aside class="rf-sidebar @(isSidebarOpen ? "open" : "")">
+        <div class="rf-brand">
+            <span class="rf-brand-mark">RF</span>
+            <div>
+                <strong>RentFlow</strong>
+                <small>Property Operations</small>
+            </div>
+        </div>
+
+        <div class="rf-role-badge">@Role</div>
+
+        <div class="rf-nav">
             @if (Role == "Admin")
             {
                 <AdminNavMenu />
@@ -22,44 +32,51 @@
                 <TenantNavMenu />
             }
         </div>
-    </div>
+    </aside>
 
-    <div class="main-content">
-        <div class="top-header">
-            <h5 class="m-0">@PageTitle</h5>
-            <div class="ms-auto d-flex align-items-center gap-3">
-                
-                <button class="dark-toggle-btn" @onclick="ToggleDarkMode" title="Toggle Dark Mode">
+    @if (isSidebarOpen)
+    {
+        <div class="rf-sidebar-overlay" @onclick="CloseSidebar"></div>
+    }
+
+    <div class="rf-main">
+        <header class="rf-header">
+            <div class="d-flex align-items-center gap-2">
+                <button class="rf-menu-btn" @onclick="ToggleSidebar" title="Toggle menu">
+                    <i class="bi bi-list"></i>
+                </button>
+                <h5 class="m-0">@PageTitle</h5>
+            </div>
+
+            <div class="rf-header-actions">
+                <button class="dark-toggle-btn" @onclick="ToggleDarkMode" title="Toggle theme">
                     <i class="bi @(isDarkMode ? "bi-moon-stars-fill" : "bi-sun-fill")"></i>
                 </button>
 
                 @if (Role == "Landlord" || Role == "Tenant")
                 {
-                    <button class="btn btn-link p-0 position-relative text-navy" @onclick="ToggleNotificationDrawer">
-                        <i class="bi bi-bell-fill fs-5"></i>
+                    <button class="rf-bell-btn" @onclick="ToggleNotificationDrawer" title="Notifications">
+                        <i class="bi bi-bell-fill"></i>
                         @if (unreadCount > 0)
                         {
-                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
-                                @unreadCount
-                                <span class="visually-hidden">unread messages</span>
-                            </span>
+                            <span class="rf-unread-badge">@unreadCount</span>
                         }
                     </button>
                 }
-                
-                <span class="fw-bold">@UserName</span>
+
+                <span class="rf-user">@UserName</span>
                 <button class="btn btn-sm btn-outline-danger rounded-pill px-3" @onclick="Logout">Logout</button>
             </div>
-        </div>
+        </header>
 
         @if (ShowWeatherAlerts)
         {
             <WeatherAlertBanner OnDismiss="() => ShowWeatherAlerts = false" />
         }
 
-        <div class="p-4" style="flex-grow: 1; overflow-y: auto;">
+        <main class="rf-page-content">
             @Body
-        </div>
+        </main>
     </div>
 </div>
 
@@ -126,9 +143,12 @@
     private bool isDrawerOpen = false;
     private List<NotificationView>? notifications;
     private int unreadCount = 0;
+    private bool isSidebarOpen = false;
 
     protected override async Task OnInitializedAsync()
     {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
@@ -174,6 +194,16 @@
         isDrawerOpen = !isDrawerOpen;
     }
 
+    private void ToggleSidebar()
+    {
+        isSidebarOpen = !isSidebarOpen;
+    }
+
+    private void CloseSidebar()
+    {
+        isSidebarOpen = false;
+    }
+
     private async Task MarkAsRead(NotificationView n)
     {
         if (!n.IsRead)
@@ -202,5 +232,18 @@
         await AuthService.Logout();
         NavigationManager.NavigateTo("/login");
     }
-}
 
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        if (isSidebarOpen)
+        {
+            isSidebarOpen = false;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+    }
+}
