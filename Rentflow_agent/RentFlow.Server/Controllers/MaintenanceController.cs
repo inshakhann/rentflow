@@ -128,16 +128,26 @@ namespace RentFlow.Server.Controllers
         }
 
         [HttpPost("upload")]
+        [Authorize(Roles = "Tenant")]
         public async Task<IActionResult> UploadPhoto(IFormFile file)
         {
             if (file == null || file.Length == 0)
                 return BadRequest("No file uploaded.");
 
+            const long maxFileSizeBytes = 5 * 1024 * 1024; // 5 MB
+            if (file.Length > maxFileSizeBytes)
+                return BadRequest("File is too large. Max allowed size is 5 MB.");
+
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp" };
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!allowedExtensions.Contains(extension))
+                return BadRequest("Unsupported file type. Allowed types: .jpg, .jpeg, .png, .webp");
+
             var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
             if (!Directory.Exists(uploadsFolder))
                 Directory.CreateDirectory(uploadsFolder);
 
-            var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
+            var fileName = $"{Guid.NewGuid()}{extension}";
             var filePath = Path.Combine(uploadsFolder, fileName);
 
             using (var stream = new FileStream(filePath, FileMode.Create))
