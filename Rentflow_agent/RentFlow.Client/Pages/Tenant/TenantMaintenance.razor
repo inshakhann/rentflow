@@ -500,13 +500,28 @@
 
     private void ParseDraftedTicket(string content)
     {
-        var match = Regex.Match(content, @"```json\s*(\{.*?\})\s*```", RegexOptions.Singleline);
-        if (match.Success)
+        string? candidateJson = null;
+
+        var fencedMatch = Regex.Match(content, @"```json\s*(\{.*?\})\s*```", RegexOptions.Singleline);
+        if (fencedMatch.Success)
+        {
+            candidateJson = fencedMatch.Groups[1].Value;
+        }
+        else
+        {
+            // Fallback: try extracting a trailing JSON object when model misses markdown fencing.
+            var looseMatch = Regex.Match(content, "(\\{[\\s\\S]*\"category\"[\\s\\S]*\"urgency\"[\\s\\S]*\"description\"[\\s\\S]*\\})", RegexOptions.IgnoreCase);
+            if (looseMatch.Success)
+            {
+                candidateJson = looseMatch.Groups[1].Value;
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(candidateJson))
         {
             try
             {
-                var json = match.Groups[1].Value;
-                draftedTicket = JsonSerializer.Deserialize<DraftedTicketInfo>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                draftedTicket = JsonSerializer.Deserialize<DraftedTicketInfo>(candidateJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
                 if (draftedTicket != null)
                 {
                     isTicketDrafted = true;
