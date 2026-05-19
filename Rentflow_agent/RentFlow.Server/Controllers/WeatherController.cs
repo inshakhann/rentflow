@@ -54,9 +54,19 @@ namespace RentFlow.Server.Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+            var dismissedAlertIds = await _context.Notifications
+                .Where(n => n.UserId == userId && n.Type == "WeatherRead")
+                .Select(n => n.Message)
+                .ToListAsync();
+
+            var dismissedIds = dismissedAlertIds
+                .Select(v => int.TryParse(v, out var id) ? id : -1)
+                .Where(id => id > 0)
+                .ToHashSet();
+
             var alerts = await _context.WeatherAlertLogs
                 .Include(w => w.Property)
-                .Where(w => w.Property.LandlordId == userId && !w.IsRead)
+                .Where(w => w.Property.LandlordId == userId)
                 .Select(w => new
                 {
                     w.Id,
@@ -65,12 +75,12 @@ namespace RentFlow.Server.Controllers
                     w.AlertType,
                     w.Message,
                     w.TriggeredAt,
-                    w.IsRead
+                    IsRead = false
                 })
                 .OrderByDescending(w => w.TriggeredAt)
                 .ToListAsync();
 
-            return Ok(alerts);
+            return Ok(alerts.Where(a => !dismissedIds.Contains(a.Id)));
         }
 
         [HttpPut("alerts/{id}/read")]
@@ -101,7 +111,23 @@ namespace RentFlow.Server.Controllers
 
             if (alert == null) return NotFound();
 
-            alert.IsRead = true;
+            var alreadyDismissed = await _context.Notifications.AnyAsync(n =>
+                n.UserId == userId &&
+                n.Type == "WeatherRead" &&
+                n.Message == id.ToString());
+
+            if (!alreadyDismissed)
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = userId,
+                    Title = "Weather Alert Dismissed",
+                    Message = id.ToString(),
+                    Type = "WeatherRead",
+                    IsRead = true
+                });
+            }
+
             await _context.SaveChangesAsync();
 
             return Ok();
@@ -123,8 +149,18 @@ namespace RentFlow.Server.Controllers
             if (lease == null)
                 return Ok(new System.Collections.Generic.List<object>());
 
+            var dismissedAlertIds = await _context.Notifications
+                .Where(n => n.UserId == userId && n.Type == "WeatherRead")
+                .Select(n => n.Message)
+                .ToListAsync();
+
+            var dismissedIds = dismissedAlertIds
+                .Select(v => int.TryParse(v, out var id) ? id : -1)
+                .Where(id => id > 0)
+                .ToHashSet();
+
             var alerts = await _context.WeatherAlertLogs
-                .Where(w => w.PropertyId == lease.Unit.PropertyId && !w.IsRead)
+                .Where(w => w.PropertyId == lease.Unit.PropertyId)
                 .Select(w => new
                 {
                     w.Id,
@@ -132,12 +168,12 @@ namespace RentFlow.Server.Controllers
                     w.AlertType,
                     w.Message,
                     w.TriggeredAt,
-                    w.IsRead
+                    IsRead = false
                 })
                 .OrderByDescending(w => w.TriggeredAt)
                 .ToListAsync();
 
-            return Ok(alerts);
+            return Ok(alerts.Where(a => !dismissedIds.Contains(a.Id)));
         }
     }
 }
