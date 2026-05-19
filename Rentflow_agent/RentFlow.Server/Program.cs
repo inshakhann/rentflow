@@ -43,7 +43,18 @@ using (var scope = app.Services.CreateScope())
 {
     var services = scope.ServiceProvider;
     var context = services.GetRequiredService<AppDbContext>();
-    context.Database.Migrate(); // Ensure database is created and migrations are applied
+
+    // If no EF migrations exist, fallback to EnsureCreated so fresh environments still boot.
+    var hasMigrations = context.Database.GetMigrations().Any();
+    if (hasMigrations)
+    {
+        context.Database.Migrate();
+    }
+    else
+    {
+        context.Database.EnsureCreated();
+    }
+
     await SeedData.InitializeAsync(context);
 }
 
