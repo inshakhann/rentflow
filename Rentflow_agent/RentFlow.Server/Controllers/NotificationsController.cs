@@ -25,7 +25,7 @@ namespace RentFlow.Server.Controllers
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var notifications = await _context.Notifications
-                .Where(n => n.UserId == userId)
+                .Where(n => n.UserId == userId && n.Type != "WeatherRead")
                 .OrderByDescending(n => n.CreatedAt)
                 .Take(50)
                 .Select(n => new
