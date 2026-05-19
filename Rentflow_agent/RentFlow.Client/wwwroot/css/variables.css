@@ -1,11 +1,15 @@
 :root {
   --color-navy: #14213d;
+  --color-navy-rgb: 20, 33, 61;
   --color-navy-light: #213b68;
   --color-teal: #0f8b8d;
+  --color-teal-rgb: 15, 139, 141;
+  --color-teal-ink: #0b5f61;
   --color-teal-light: #d5f5f5;
   --color-amber: #f59e0b;
   --color-amber-light: #fff3da;
   --color-red: #dc2626;
+  --color-red-rgb: 220, 38, 38;
   --color-red-light: #fee2e2;
   --color-green: #059669;
   --color-green-light: #d1fae5;
@@ -28,12 +32,16 @@
 
 [data-theme="dark"] {
   --color-navy: #dbeafe;
+  --color-navy-rgb: 20, 33, 61;
   --color-navy-light: #9ab0d8;
   --color-teal: #40c4c6;
+  --color-teal-rgb: 64, 196, 198;
+  --color-teal-ink: #99f6e4;
   --color-teal-light: rgba(64, 196, 198, 0.2);
   --color-amber-light: rgba(245, 158, 11, 0.2);
   --color-red-light: rgba(220, 38, 38, 0.2);
   --color-green-light: rgba(5, 150, 105, 0.2);
+  --color-red-rgb: 248, 113, 113;
 
   --color-white: #151d31;
   --color-light: #11182a;

@@ -33,15 +33,25 @@ a {
 }
 
 .text-navy { color: var(--color-navy) !important; }
-.text-teal { color: var(--color-teal) !important; }
+.text-teal { color: var(--color-teal-ink) !important; }
 .text-green { color: var(--color-green) !important; }
 .text-amber { color: var(--color-amber) !important; }
-.bg-teal { background-color: var(--color-teal) !important; }
+.text-muted { color: var(--color-text-muted) !important; }
+.text-dark { color: var(--color-text) !important; }
+
+.bg-teal {
+  background-color: rgba(var(--color-teal-rgb), var(--bs-bg-opacity, 1)) !important;
+}
+.bg-red {
+  background-color: rgba(var(--color-red-rgb), var(--bs-bg-opacity, 1)) !important;
+}
 .bg-teal-light { background-color: var(--color-teal-light) !important; }
 .bg-amber-light { background-color: var(--color-amber-light) !important; }
 .bg-green-light { background-color: var(--color-green-light) !important; }
 .bg-red-light { background-color: var(--color-red-light) !important; }
-.bg-navy { background-color: var(--color-navy) !important; }
+.bg-navy {
+  background-color: rgba(var(--color-navy-rgb), var(--bs-bg-opacity, 1)) !important;
+}
 
 .form-control,
 .form-select {
@@ -69,6 +79,12 @@ a {
   border-bottom: none;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.table > :not(caption) > * > * {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 .btn-primary,
@@ -298,6 +314,13 @@ a {
   transition: all 0.2s ease;
 }
 
+.rf-menu-btn i,
+.dark-toggle-btn i,
+.rf-bell-btn i {
+  font-size: 1rem;
+  line-height: 1;
+}
+
 .rf-menu-btn:hover,
 .dark-toggle-btn:hover,
 .rf-bell-btn:hover {
@@ -328,6 +351,21 @@ a {
   font-size: 10px;
   font-weight: 800;
   border: 2px solid var(--color-card-bg);
+}
+
+[data-theme="dark"] .rf-menu-btn,
+[data-theme="dark"] .dark-toggle-btn,
+[data-theme="dark"] .rf-bell-btn {
+  background: #0f1b34;
+  border-color: #2b3b5c;
+  color: #e2ebfb;
+}
+
+[data-theme="dark"] .rf-menu-btn:hover,
+[data-theme="dark"] .dark-toggle-btn:hover,
+[data-theme="dark"] .rf-bell-btn:hover {
+  border-color: var(--color-teal);
+  color: var(--color-teal);
 }
 
 .rf-page-content {
@@ -378,6 +416,80 @@ a {
 
 .list-group-item:hover {
   background: var(--color-gray-100);
+}
+
+/* Dark mode readability overrides */
+[data-theme="dark"] .card,
+[data-theme="dark"] .glass-card,
+[data-theme="dark"] .form-card,
+[data-theme="dark"] .stat-card {
+  background: var(--color-card-bg) !important;
+  border-color: var(--color-border) !important;
+}
+
+[data-theme="dark"] .glass-search-bar,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .input-group-text.bg-white,
+[data-theme="dark"] .bg-white {
+  background-color: var(--color-gray-200) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .bg-light {
+  background-color: var(--color-gray-200) !important;
+  color: var(--color-text) !important;
+}
+
+[data-theme="dark"] .table {
+  --bs-table-color: var(--color-text);
+  --bs-table-bg: transparent;
+  --bs-table-hover-color: var(--color-text);
+  --bs-table-hover-bg: rgba(148, 163, 184, 0.08);
+}
+
+[data-theme="dark"] .table thead th {
+  background: #1e2f53;
+  color: #f8fbff;
+}
+
+[data-theme="dark"] .table > :not(caption) > * > * {
+  color: var(--color-text);
+  border-color: #2a3a5e;
+}
+
+[data-theme="dark"] .table .text-navy,
+[data-theme="dark"] .table .fw-bold {
+  color: #e8efff !important;
+}
+
+[data-theme="dark"] .table .text-muted {
+  color: #b8c6e2 !important;
+}
+
+[data-theme="dark"] .hover-row:hover,
+[data-theme="dark"] .table-hover > tbody > tr:hover > * {
+  background-color: rgba(148, 163, 184, 0.1) !important;
+}
+
+[data-theme="dark"] .badge.bg-secondary {
+  background-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .btn-outline-secondary {
+  border-color: #4b5f85;
+  color: #d5e0f7;
+}
+
+[data-theme="dark"] .btn-outline-secondary:hover {
+  background: #2a3a5e;
+  border-color: #2a3a5e;
+  color: #f8fbff;
+}
+
+.badge.bg-teal.bg-opacity-10 {
+  background-color: rgba(var(--color-teal-rgb), 0.16) !important;
+  color: var(--color-teal-ink) !important;
 }
 
 /* Utility visuals used across pages */
