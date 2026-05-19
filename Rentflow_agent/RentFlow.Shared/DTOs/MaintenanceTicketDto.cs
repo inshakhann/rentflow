@@ -12,6 +12,7 @@ namespace RentFlow.Shared.DTOs
         public string Status { get; set; } = string.Empty;
         public string? AssignedTo { get; set; }
         public int Urgency { get; set; }
+        public string? PhotoPath { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

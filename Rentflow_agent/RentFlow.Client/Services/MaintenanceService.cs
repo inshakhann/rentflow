@@ -69,6 +69,7 @@ namespace RentFlow.Client.Services
         public string Description { get; set; } = "";
         public string Status { get; set; } = "";
         public int Urgency { get; set; }
+        public string? PhotoPath { get; set; }
         public DateTime CreatedAt { get; set; }
     }
 }

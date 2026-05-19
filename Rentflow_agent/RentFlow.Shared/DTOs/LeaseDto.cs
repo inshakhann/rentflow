@@ -26,4 +26,20 @@ namespace RentFlow.Shared.DTOs
         public DateTime? EndDate { get; set; }
         public decimal MonthlyRent { get; set; }
     }
+
+    public class TenantLeaseDto
+    {
+        public int LeaseId { get; set; }
+        public string UnitNumber { get; set; } = string.Empty;
+        public string PropertyName { get; set; } = string.Empty;
+        public string PropertyAddress { get; set; } = string.Empty;
+        public string PropertyCity { get; set; } = string.Empty;
+        public double? Latitude { get; set; }
+        public double? Longitude { get; set; }
+        public decimal MonthlyRent { get; set; }
+        public DateTime StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string LandlordName { get; set; } = string.Empty;
+        public string LandlordEmail { get; set; } = string.Empty;
+    }
 }

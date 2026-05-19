@@ -90,5 +90,26 @@ namespace RentFlow.Server.Controllers
 
             return Ok(payments);
         }
+
+        [HttpPost("{id}/pay")]
+        public async Task<IActionResult> PayPayment(int id)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var payment = await _context.Payments
+                .Include(p => p.Lease)
+                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == userId);
+
+            if (payment == null) return NotFound();
+
+            if (payment.Status == "Paid") return BadRequest("Payment already completed.");
+
+            payment.Status = "Paid";
+            payment.PaidDate = System.DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+
+            return Ok();
+        }
     }
 }

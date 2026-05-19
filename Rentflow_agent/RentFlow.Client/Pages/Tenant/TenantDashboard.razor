@@ -3,6 +3,8 @@
 @attribute [Authorize(Roles = "Tenant")]
 @inject PaymentService PaymentService
 @inject MaintenanceService MaintenanceService
+@inject LeaseService LeaseService
+@inject WeatherService WeatherService
 
 <PageTitle>Tenant Dashboard</PageTitle>
 
@@ -12,55 +14,118 @@
 }
 else
 {
-    <div class="row mb-4">
-        <div class="col-xl-4 col-md-6 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-teal)">
-                <div class="d-flex justify-content-between align-items-center">
+    @if (weatherAlerts != null && weatherAlerts.Any())
+    {
+        @foreach (var alert in weatherAlerts)
+        {
+            <div class="alert alert-warning alert-dismissible fade show border-0 shadow-sm d-flex justify-content-between align-items-center mb-4 p-3 animate-fade-in" role="alert" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 5px solid var(--color-amber) !important; color: #92400e; border-radius: 12px;">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-exclamation-triangle-fill fs-4 me-3" style="color: #d97706;"></i>
                     <div>
-                        <div class="card-title">Next Payment</div>
-                        <div class="stat-value">
-                            @if (nextPayment != null)
-                            {
-                                <span>Rs @(nextPayment.Amount + nextPayment.LateFee)</span>
-                            }
-                            else
-                            {
-                                <span>Up to date</span>
-                            }
+                        <strong class="fw-bold">Severe Weather Alert (@alert.AlertType):</strong> @alert.Message
+                    </div>
+                </div>
+                <button type="button" class="btn p-1 text-amber-800 hover-opacity" @onclick="() => DismissAlert(alert.Id)" aria-label="Close" style="background: none; border: none;">
+                    <i class="bi bi-x-lg fs-5"></i>
+                </button>
+            </div>
+        }
+    }
+
+    <!-- Hero Rent Section -->
+    <div class="card border-0 mb-4 overflow-hidden shadow-sm" style="background: linear-gradient(135deg, var(--color-navy) 0%, #1e293b 100%); border-radius: 20px;">
+        <div class="card-body p-4 p-md-5 text-white position-relative">
+            <div class="position-absolute top-0 end-0 p-4 opacity-10 d-none d-md-block" style="font-size: 8rem; pointer-events: none;">
+                <i class="bi bi-wallet2"></i>
+            </div>
+            
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                <div>
+                    <span class="text-white-50 text-uppercase tracking-wider fw-bold small">Your Rent</span>
+                    
+                    @if (nextPayment != null)
+                    {
+                        <h1 class="display-5 fw-extrabold my-2 text-white" style="font-family: 'Outfit', sans-serif;">
+                            Rs @((nextPayment.Amount + nextPayment.LateFee).ToString("N0"))
+                        </h1>
+                        <div class="text-white-50 mb-3 mb-md-0">
+                            <i class="bi bi-clock me-2"></i>Due Date: @nextPayment.DueDate.ToString("MMMM dd, yyyy")
                         </div>
-                        @if (nextPayment != null)
+                        
+                        @if (nextPayment.Status == "Late")
                         {
-                            <div class="text-muted small mt-1">Due: @nextPayment.DueDate.ToString("MMM dd, yyyy")</div>
+                            <div class="text-danger-light fw-bold mt-2 d-flex align-items-center">
+                                <i class="bi bi-exclamation-octagon-fill me-2 fs-5 animate-pulse"></i>
+                                OVERDUE — includes Rs @nextPayment.LateFee.ToString("N0") late fee
+                            </div>
                         }
+                    }
+                    else
+                    {
+                        <h1 class="display-5 fw-extrabold my-2 text-white" style="font-family: 'Outfit', sans-serif;">
+                            Up to date!
+                        </h1>
+                        <div class="text-teal fw-bold d-flex align-items-center">
+                            <i class="bi bi-shield-check me-2 fs-4"></i>No rent balance currently due.
+                        </div>
+                    }
+                </div>
+                
+                <div class="mt-3 mt-md-0">
+                    @if (nextPayment == null)
+                    {
+                        <span class="badge bg-success px-4 py-2 fs-6 rounded-pill shadow-sm"><i class="bi bi-check-circle me-2"></i>Paid</span>
+                    }
+                    else if (nextPayment.Status == "Late")
+                    {
+                        <span class="badge bg-danger px-4 py-2 fs-6 rounded-pill shadow-sm"><i class="bi bi-exclamation-circle me-2"></i>Overdue</span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-teal px-4 py-2 fs-6 rounded-pill shadow-sm"><i class="bi bi-hourglass-split me-2"></i>Pending</span>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Info Row -->
+    <div class="row mb-4">
+        <div class="col-md-4 mb-3">
+            <div class="stat-card h-100" style="border-left-color: var(--color-teal); border-radius: 16px;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 bg-teal-light rounded-circle text-teal me-3" style="width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-door-closed fs-4"></i>
                     </div>
-                    <div class="p-3 bg-teal-light rounded-circle text-teal">
-                        <i class="bi bi-calendar-check fs-4"></i>
+                    <div>
+                        <div class="card-title text-muted mb-0 small">My Unit</div>
+                        <div class="stat-value fs-5 fw-bold text-navy">@(lease != null ? lease.UnitNumber : "N/A")</div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-xl-4 col-md-6 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-danger)">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="card-title">Late Fees</div>
-                        <div class="stat-value">Rs @payments?.Where(p => p.Status == "Late").Sum(p => p.LateFee)</div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card h-100" style="border-left-color: var(--color-navy); border-radius: 16px;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 rounded-circle me-3" style="width: 54px; height: 54px; display: flex; align-items: center; justify-content: center; background-color: rgba(26, 43, 76, 0.1); color: var(--color-navy);">
+                        <i class="bi bi-building fs-4"></i>
                     </div>
-                    <div class="p-3 bg-danger bg-opacity-10 rounded-circle text-danger">
-                        <i class="bi bi-exclamation-triangle fs-4"></i>
+                    <div>
+                        <div class="card-title text-muted mb-0 small">Property</div>
+                        <div class="stat-value fs-5 fw-bold text-navy">@(lease != null ? lease.PropertyName : "N/A")</div>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-xl-4 col-md-6 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-amber)">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="card-title">My Tickets</div>
-                        <div class="stat-value">@tickets?.Count</div>
+        <div class="col-md-4 mb-3">
+            <div class="stat-card h-100" style="border-left-color: var(--color-amber); border-radius: 16px;">
+                <div class="d-flex align-items-center">
+                    <div class="p-3 bg-amber-light rounded-circle text-amber me-3" style="width: 54px; height: 54px; display: flex; align-items: center; justify-content: center;">
+                        <i class="bi bi-person-badge fs-4"></i>
                     </div>
-                    <div class="p-3 bg-amber-light rounded-circle text-amber">
-                        <i class="bi bi-tools fs-4"></i>
+                    <div>
+                        <div class="card-title text-muted mb-0 small">Landlord</div>
+                        <div class="stat-value fs-5 fw-bold text-navy">@(lease != null ? lease.LandlordName : "N/A")</div>
                     </div>
                 </div>
             </div>
@@ -68,52 +133,96 @@ else
     </div>
 
     <div class="row">
-        <div class="col-md-6 mb-4">
-            <div class="form-card h-100">
+        <!-- Recent Tickets -->
+        <div class="col-md-7 mb-4">
+            <div class="form-card h-100 shadow-sm" style="border-radius: 16px;">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0">Recent Payments</h4>
-                    <a href="tenant/payments" class="btn btn-sm btn-outline-navy">View All</a>
+                    <h4 class="mb-0 text-navy fw-bold">Recent Maintenance Tickets</h4>
+                    <a href="tenant/maintenance" class="btn btn-sm btn-outline-navy">View All</a>
                 </div>
-                <div class="list-group list-group-flush">
-                    @if (payments == null || !payments.Any(p => p.Status == "Paid"))
-                    {
-                        <div class="text-center py-3 text-muted">No recent payments.</div>
-                    }
-                    else
-                    {
-                        @foreach (var payment in payments.Where(p => p.Status == "Paid").Take(3))
+                
+                @if (tickets == null || !tickets.Any())
+                {
+                    <div class="text-center py-5 text-muted">
+                        <i class="bi bi-clipboard-x fs-1 opacity-50 mb-3 d-block"></i>
+                        No recent tickets submitted.
+                    </div>
+                }
+                else
+                {
+                    <div class="list-group list-group-flush">
+                        @foreach (var ticket in tickets.Take(3))
                         {
-                            <div class="list-group-item px-0">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>Rs @(payment.Amount + payment.LateFee)</strong>
-                                        <div class="text-muted small">Paid on @payment.PaidDate?.ToString("MMM dd, yyyy")</div>
+                            <div class="list-group-item px-0 py-3 border-bottom d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    <div class="p-2 rounded bg-light text-navy me-3">
+                                        <i class="bi bi-tools fs-5"></i>
                                     </div>
-                                    <span class="badge-paid"><i class="bi bi-check-circle me-1"></i>Paid</span>
+                                    <div>
+                                        <div class="fw-bold text-navy">@ticket.Category</div>
+                                        <small class="text-muted">Submitted on @ticket.CreatedAt.ToString("MMM dd, yyyy")</small>
+                                    </div>
+                                </div>
+                                <div>
+                                    @if (ticket.Status == "Open")
+                                    {
+                                        <span class="badge bg-warning text-dark px-3 py-1 rounded-pill"><i class="bi bi-circle-fill me-1 small animate-pulse"></i>Open</span>
+                                    }
+                                    else if (ticket.Status == "InProgress")
+                                    {
+                                        <span class="badge bg-primary px-3 py-1 rounded-pill"><i class="bi bi-play-circle-fill me-1 small"></i>In Progress</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-success px-3 py-1 rounded-pill"><i class="bi bi-check-circle-fill me-1 small"></i>Resolved</span>
+                                    }
                                 </div>
                             </div>
                         }
-                    }
-                </div>
+                    </div>
+                }
             </div>
         </div>
-        <div class="col-md-6 mb-4">
-            <div class="form-card h-100 bg-teal text-white">
-                <div class="d-flex align-items-center mb-3">
-                    <i class="bi bi-robot fs-2 me-3"></i>
-                    <h4 class="mb-0 text-white">Smart Maintenance</h4>
+
+        <!-- Quick Issue Reporter Action -->
+        <div class="col-md-5 mb-4">
+            <div class="form-card h-100 text-white shadow-sm d-flex flex-column justify-content-between p-4" style="background: linear-gradient(135deg, var(--color-teal) 0%, #0d9488 100%); border-radius: 16px; border: none;">
+                <div>
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="p-3 bg-white bg-opacity-20 rounded-circle text-white me-3" style="width: 50px; height: 50px; display: flex; align-items: center; justify-content: center;">
+                            <i class="bi bi-robot fs-3"></i>
+                        </div>
+                        <h4 class="mb-0 text-white fw-bold">Smart Maintenance</h4>
+                    </div>
+                    <p class="mb-4 text-white-50 leading-relaxed">Having an issue? Chat with our AI property manager assistant to instantly diagnose, log, and send your ticket directly to the maintenance team.</p>
                 </div>
-                <p class="mb-4 text-white-50">Having an issue? Chat with our AI bot to instantly classify and route your maintenance request to the right person.</p>
-                <a href="tenant/maintenance" class="btn btn-light text-teal w-100 fw-bold py-2">Start Chat <i class="bi bi-arrow-right ms-2"></i></a>
+                
+                <a href="tenant/maintenance" class="btn btn-light text-teal w-100 fw-bold py-3 shadow-sm hover-scale" style="border-radius: 12px; transition: transform 0.2s ease;">
+                    <i class="bi bi-chat-text-fill me-2"></i>Report an Issue
+                </a>
             </div>
         </div>
     </div>
 }
 
+<style>
+    .hover-scale:hover {
+        transform: translateY(-2px);
+    }
+    .hover-opacity:hover {
+        opacity: 0.8;
+    }
+    .text-danger-light {
+        color: #fca5a5;
+    }
+</style>
+
 @code {
     private List<TenantPaymentHistory>? payments;
     private List<TenantTicketView>? tickets;
     private TenantPaymentHistory? nextPayment;
+    private TenantLeaseDto? lease;
+    private List<WeatherAlertView>? weatherAlerts;
     private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
@@ -121,7 +230,9 @@ else
         var tasks = new List<Task>
         {
             Task.Run(async () => payments = await PaymentService.GetTenantHistory()),
-            Task.Run(async () => tickets = await MaintenanceService.GetTenantTickets())
+            Task.Run(async () => tickets = await MaintenanceService.GetTenantTickets()),
+            Task.Run(async () => lease = await LeaseService.GetTenantLease()),
+            Task.Run(async () => weatherAlerts = await WeatherService.GetTenantAlerts())
         };
 
         await Task.WhenAll(tasks);
@@ -134,5 +245,15 @@ else
         }
         
         isLoading = false;
+    }
+
+    private async Task DismissAlert(int alertId)
+    {
+        var success = await WeatherService.MarkAlertAsRead(alertId);
+        if (success && weatherAlerts != null)
+        {
+            weatherAlerts.RemoveAll(a => a.Id == alertId);
+            StateHasChanged();
+        }
     }
 }

@@ -29,6 +29,12 @@ namespace RentFlow.Client.Services
         {
             return await _httpClient.GetFromJsonAsync<List<TenantPaymentHistory>>("api/payments/tenant/history");
         }
+
+        public async Task<bool> PayPayment(int paymentId)
+        {
+            var response = await _httpClient.PostAsync($"api/payments/{paymentId}/pay", null);
+            return response.IsSuccessStatusCode;
+        }
     }
 
     public class RevenueItem

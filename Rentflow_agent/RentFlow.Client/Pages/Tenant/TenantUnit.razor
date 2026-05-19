@@ -1,64 +1,134 @@
 @page "/tenant/unit"
 @using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
 @attribute [Authorize(Roles = "Tenant")]
+@inject LeaseService LeaseService
+@inject IJSRuntime JS
 
 <PageTitle>My Unit</PageTitle>
 
-<h2 class="mb-4">My Unit Details</h2>
-
-<div class="row">
-    <div class="col-md-6 mb-4">
-        <div class="form-card h-100">
-            <h4 class="mb-4">Lease Information</h4>
-            <table class="table">
-                <tbody>
-                    <tr>
-                        <th class="text-muted" style="width: 40%;">Property</th>
-                        <td>Gulberg Heights</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Unit Number</th>
-                        <td>101</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Monthly Rent</th>
-                        <td>Rs 50,000</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Lease Start</th>
-                        <td>Jan 01, 2024</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Lease Status</th>
-                        <td><span class="badge-paid">Active</span></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-    
-    <div class="col-md-6 mb-4">
-        <div class="form-card h-100">
-            <h4 class="mb-4">Landlord Contact</h4>
-            <div class="d-flex align-items-center mb-4">
-                <div class="bg-navy text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 60px; height: 60px; font-size: 24px;">
-                    AR
-                </div>
-                <div>
-                    <h5 class="mb-1">Ahmed Raza</h5>
-                    <div class="text-muted">Property Manager</div>
-                </div>
-            </div>
-            
-            <p><i class="bi bi-envelope text-muted me-2"></i> ahmed.landlord@rentflow.io</p>
-            <p><i class="bi bi-telephone text-muted me-2"></i> +92 300 1234567</p>
-            
-            <button class="btn btn-outline-navy w-100 mt-3"><i class="bi bi-chat-dots me-2"></i>Send Message</button>
-        </div>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-navy fw-bold mb-0"><i class="bi bi-door-closed text-teal me-2"></i>My Unit Details</h2>
 </div>
 
+@if (isLoading)
+{
+    <LoadingSpinner />
+}
+else if (lease == null)
+{
+    <div class="card border-0 shadow-sm p-5 text-center" style="border-radius: 16px;">
+        <i class="bi bi-info-circle fs-1 text-teal mb-3"></i>
+        <h5 class="fw-bold text-navy">No Active Lease Found</h5>
+        <p class="text-muted mb-0">Please contact the administration if this is an error.</p>
+    </div>
+}
+else
+{
+    <div class="row">
+        <!-- Lease Info Card -->
+        <div class="col-md-6 mb-4">
+            <div class="form-card h-100 shadow-sm" style="border-radius: 16px;">
+                <h4 class="text-navy fw-bold mb-4"><i class="bi bi-file-earmark-text text-teal me-2"></i>Lease Information</h4>
+                <table class="table align-middle">
+                    <tbody>
+                        <tr>
+                            <th class="text-muted py-3" style="width: 40%;">Property</th>
+                            <td class="fw-bold text-navy">@lease.PropertyName</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Address</th>
+                            <td class="text-navy">@lease.PropertyAddress, @lease.PropertyCity</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Unit Number</th>
+                            <td class="fw-bold text-teal">@lease.UnitNumber</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Monthly Rent</th>
+                            <td class="fw-bold text-navy">Rs @lease.MonthlyRent.ToString("N0")</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Lease Start</th>
+                            <td class="text-navy">@lease.StartDate.ToString("MMM dd, yyyy")</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Lease End</th>
+                            <td class="text-navy">@(lease.EndDate?.ToString("MMM dd, yyyy") ?? "Continuous / Month-to-Month")</td>
+                        </tr>
+                        <tr>
+                            <th class="text-muted py-3">Lease Status</th>
+                            <td><span class="badge-paid"><i class="bi bi-check-circle-fill me-1 small"></i>Active</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Landlord Contact Card & Map Embed -->
+        <div class="col-md-6 mb-4 d-flex flex-column gap-4">
+            <div class="form-card shadow-sm" style="border-radius: 16px;">
+                <h4 class="text-navy fw-bold mb-4"><i class="bi bi-person-badge text-teal me-2"></i>Landlord Contact</h4>
+                <div class="d-flex align-items-center mb-4">
+                    <div class="bg-navy text-white rounded-circle d-flex justify-content-center align-items-center me-3" 
+                         style="width: 60px; height: 60px; font-size: 20px; font-weight: bold;">
+                        @GetInitials(lease.LandlordName)
+                    </div>
+                    <div>
+                        <h5 class="mb-1 fw-bold text-navy">@lease.LandlordName</h5>
+                        <div class="text-muted small">Property Manager</div>
+                    </div>
+                </div>
+                
+                <p class="mb-2"><i class="bi bi-envelope text-teal me-2"></i> @lease.LandlordEmail</p>
+                <p class="mb-0"><i class="bi bi-telephone text-teal me-2"></i> +92 300 1234567</p>
+            </div>
+
+            <!-- Google Maps Coordinate Embed Card -->
+            @if (lease.Latitude.HasValue && lease.Longitude.HasValue)
+            {
+                <div class="form-card shadow-sm" style="border-radius: 16px;">
+                    <h4 class="text-navy fw-bold mb-3"><i class="bi bi-geo-alt-fill text-teal me-2"></i>Property Location</h4>
+                    <div class="border rounded overflow-hidden shadow-sm" style="height: 250px; background-color: #e5e7eb;">
+                        <iframe id="googleMapIframe" width="100%" height="250" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 @code {
-    // This is mostly static/mocked for the TenantUnit page as per spec constraints, 
-    // real data would require a specific API endpoint.
+    private TenantLeaseDto? lease;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        lease = await LeaseService.GetTenantLease();
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (lease != null && lease.Latitude.HasValue && lease.Longitude.HasValue)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("initMapIframe", "googleMapIframe", lease.Latitude.Value, lease.Longitude.Value);
+            }
+            catch
+            {
+                // JavaScript context might not be fully initialized or iframe not found yet
+            }
+        }
+    }
+
+    private string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "L";
+        var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length > 1 
+            ? $"{parts[0][0]}{parts[1][0]}".ToUpper() 
+            : $"{parts[0][0]}".ToUpper();
+    }
 }

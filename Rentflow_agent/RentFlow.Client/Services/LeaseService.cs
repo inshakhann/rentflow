@@ -31,6 +31,18 @@ namespace RentFlow.Client.Services
             var response = await _httpClient.PostAsJsonAsync("api/leases", dto);
             return response.IsSuccessStatusCode;
         }
+
+        public async Task<TenantLeaseDto?> GetTenantLease()
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<TenantLeaseDto>("api/leases/tenant");
+            }
+            catch (Exception)
+            {
+                return null;
+            }
+        }
     }
 
     public class AvailableTenantView

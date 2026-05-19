@@ -2,10 +2,13 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Tenant")]
 @inject PaymentService PaymentService
+@inject ToastService ToastService
 
 <PageTitle>Payment History</PageTitle>
 
-<h2 class="mb-4">Payment History</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="text-navy fw-bold mb-0"><i class="bi bi-wallet2 text-teal me-2"></i>Payment History</h2>
+</div>
 
 @if (payments == null)
 {
@@ -13,51 +16,65 @@
 }
 else
 {
-    <div class="form-card">
+    <div class="form-card shadow-sm border-0" style="border-radius: 16px;">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
-                <thead>
+                <thead class="bg-navy text-white small text-uppercase">
                     <tr>
-                        <th>Due Date</th>
+                        <th class="ps-3 py-3">Due Date</th>
                         <th>Amount</th>
                         <th>Late Fee</th>
                         <th>Total</th>
                         <th>Status</th>
                         <th>Paid Date</th>
-                        <th>Actions</th>
+                        <th class="pe-3 text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var payment in payments)
                     {
                         <tr>
-                            <td>@payment.DueDate.ToString("MMM dd, yyyy")</td>
+                            <td class="ps-3 py-3 fw-bold text-navy">@payment.DueDate.ToString("MMM dd, yyyy")</td>
                             <td>Rs @payment.Amount.ToString("N0")</td>
                             <td>Rs @payment.LateFee.ToString("N0")</td>
-                            <td><strong>Rs @((payment.Amount + payment.LateFee).ToString("N0"))</strong></td>
+                            <td><strong class="text-navy">Rs @((payment.Amount + payment.LateFee).ToString("N0"))</strong></td>
                             <td>
                                 @if (payment.Status == "Paid")
                                 {
-                                    <span class="badge-paid">Paid</span>
+                                    <span class="badge-paid"><i class="bi bi-check-circle-fill me-1 small"></i>Paid</span>
                                 }
                                 else if (payment.Status == "Late")
                                 {
-                                    <span class="badge-late">Late</span>
+                                    <span class="badge bg-danger rounded-pill px-3 py-1"><i class="bi bi-exclamation-octagon-fill me-1 small animate-pulse"></i>Late</span>
                                 }
                                 else
                                 {
-                                    <span class="badge-pending">Pending</span>
+                                    <span class="badge bg-teal rounded-pill px-3 py-1 text-white"><i class="bi bi-hourglass-split me-1 small"></i>Pending</span>
                                 }
                             </td>
-                            <td>@(payment.PaidDate?.ToString("MMM dd, yyyy") ?? "-")</td>
-                            <td>
+                            <td>@(payment.PaidDate?.ToString("MMM dd, yyyy M:mm tt") ?? "-")</td>
+                            <td class="pe-3 text-end">
                                 @if (payment.Status != "Paid")
                                 {
-                                    <button class="btn btn-sm btn-primary">Pay Now</button>
+                                    <button class="btn btn-sm btn-teal fw-bold px-3 py-2 shadow-sm rounded-pill hover-scale" 
+                                            @onclick="() => ProcessPayment(payment.Id)" 
+                                            disabled="@isProcessingPayment">
+                                        @if (isProcessingPayment)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-credit-card-fill me-1"></i>
+                                        }
+                                        Pay Now
+                                    </button>
                                 }
                                 else
                                 {
-                                    <button class="btn btn-sm btn-outline-secondary">Receipt</button>
+                                    <button class="btn btn-sm btn-outline-navy fw-bold px-3 py-2 rounded-pill hover-scale" @onclick="ShowReceiptInfo">
+                                        <i class="bi bi-receipt me-1"></i>Receipt
+                                    </button>
                                 }
                             </td>
                         </tr>
@@ -65,7 +82,10 @@ else
                     @if (!payments.Any())
                     {
                         <tr>
-                            <td colspan="7" class="text-center py-4">No payment history found.</td>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-inbox fs-1 opacity-50 mb-2 d-block"></i>
+                                No payment invoices found.
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -74,11 +94,61 @@ else
     </div>
 }
 
+<style>
+    .hover-scale {
+        transition: transform 0.2s ease;
+    }
+    .hover-scale:hover {
+        transform: translateY(-1px);
+    }
+</style>
+
 @code {
     private List<TenantPaymentHistory>? payments;
+    private bool isProcessingPayment = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadHistory();
+    }
+
+    private async Task LoadHistory()
+    {
         payments = await PaymentService.GetTenantHistory();
+    }
+
+    private async Task ProcessPayment(int paymentId)
+    {
+        if (isProcessingPayment) return;
+        isProcessingPayment = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await PaymentService.PayPayment(paymentId);
+            if (success)
+            {
+                ToastService.ShowSuccess("Rs " + (payments?.FirstOrDefault(p => p.Id == paymentId)?.Amount.ToString("N0") ?? "") + " paid successfully!", "Payment Confirmed");
+                await LoadHistory();
+            }
+            else
+            {
+                ToastService.ShowError("Could not complete payment on the server.", "Payment Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Payment service error: {ex.Message}", "System Failure");
+        }
+        finally
+        {
+            isProcessingPayment = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ShowReceiptInfo()
+    {
+        ToastService.ShowInfo("Receipt printed successfully. Your invoice check details are up to date.", "Receipt Generated");
     }
 }

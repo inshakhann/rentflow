@@ -32,6 +32,18 @@ namespace RentFlow.Client.Services
             var response = await _httpClient.PutAsync($"api/weather/alerts/{id}/read", null);
             return response.IsSuccessStatusCode;
         }
+
+        public async Task<List<WeatherAlertView>?> GetTenantAlerts()
+        {
+            try
+            {
+                return await _httpClient.GetFromJsonAsync<List<WeatherAlertView>>("api/weather/tenant/alerts");
+            }
+            catch (Exception)
+            {
+                return new List<WeatherAlertView>();
+            }
+        }
     }
 
     public class WeatherAlertView

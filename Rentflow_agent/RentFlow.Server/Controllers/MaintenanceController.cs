@@ -1,7 +1,10 @@
+using System;
+using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RentFlow.Server.Data;
@@ -66,6 +69,7 @@ namespace RentFlow.Server.Controllers
                     t.Description,
                     t.Status,
                     t.Urgency,
+                    t.PhotoPath,
                     t.CreatedAt
                 })
                 .OrderByDescending(t => t.CreatedAt)
@@ -95,6 +99,7 @@ namespace RentFlow.Server.Controllers
                 Description = dto.Description,
                 Urgency = dto.Urgency,
                 Status = "Open",
+                PhotoPath = dto.PhotoPath,
                 BotTranscript = "{}" // Just a placeholder
             };
 
@@ -120,6 +125,28 @@ namespace RentFlow.Server.Controllers
 
             await _context.SaveChangesAsync();
             return Ok();
+        }
+
+        [HttpPost("upload")]
+        public async Task<IActionResult> UploadPhoto(IFormFile file)
+        {
+            if (file == null || file.Length == 0)
+                return BadRequest("No file uploaded.");
+
+            var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
+            if (!Directory.Exists(uploadsFolder))
+                Directory.CreateDirectory(uploadsFolder);
+
+            var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.FileName)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var relativePath = $"/uploads/{fileName}";
+            return Ok(new { photoPath = relativePath });
         }
     }
 }

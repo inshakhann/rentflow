@@ -1,49 +1,154 @@
 @page "/tenant/maintenance"
 @using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
+@using System.Text.Json
+@using System.Text.RegularExpressions
 @attribute [Authorize(Roles = "Tenant")]
 @inject MaintenanceService MaintenanceService
+@inject ToastService ToastService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IHttpClientFactory HttpClientFactory
 
-<PageTitle>Maintenance</PageTitle>
+<PageTitle>Maintenance Portal</PageTitle>
 
 <div class="row">
+    <!-- LEFT: AI Chatbot Terminal (60% width) -->
     <div class="col-lg-7 mb-4">
-        <div class="chat-container">
-            <div class="chat-header">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-robot text-teal fs-3 me-3"></i>
-                    <div>
-                        <h5 class="mb-0 text-navy">RentFlow Bot</h5>
-                        <small class="text-muted">AI Maintenance Assistant</small>
-                    </div>
+        <div class="chat-container card shadow-sm border-0 d-flex flex-column" style="height: 600px; border-radius: 16px; background-color: var(--color-light);">
+            <div class="chat-header p-3 bg-white border-bottom d-flex align-items-center" style="border-top-left-radius: 16px; border-top-right-radius: 16px;">
+                <div class="p-2 bg-teal-light text-teal rounded-circle me-3" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+                    <i class="bi bi-robot fs-4"></i>
+                </div>
+                <div>
+                    <h5 class="mb-0 text-navy fw-bold">RentFlow Maintenance Agent</h5>
+                    <small class="text-muted d-flex align-items-center"><span class="spinner-grow spinner-grow-sm text-success me-2" role="status" style="width: 8px; height: 8px;"></span>AI Assistant online</small>
                 </div>
             </div>
             
-            <div class="chat-messages">
-                <div class="chat-bubble bot">
-                    Hello! I'm the RentFlow AI assistant. Please describe the maintenance issue you're experiencing. (e.g., "The kitchen sink is leaking and water is everywhere")
+            <div class="chat-messages p-3 flex-grow-1 overflow-auto bg-light" style="max-height: 440px;">
+                <div class="chat-message-row d-flex mb-3">
+                    <div class="avatar bg-teal text-white rounded-circle me-2" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+                        🤖
+                    </div>
+                    <div class="chat-bubble bot bg-white text-navy p-3 shadow-sm border-0" style="border-radius: 18px; border-top-left-radius: 4px; max-width: 80%; line-height: 1.5;">
+                        Hello! I am RentFlow's AI maintenance triage bot. Please describe your maintenance concern in detail (e.g., "Water is leaking from under the kitchen cabinet whenever the tap is turned on"). I will help diagnose it, request photos if needed, and draft your ticket!
+                    </div>
                 </div>
                 
-                @foreach (var msg in messages)
+                @foreach (var msg in messages.Where(m => m.Role != "system"))
                 {
-                    <div class="chat-bubble @msg.Role">
-                        @msg.Content
+                    <div class="chat-message-row d-flex mb-3 @(msg.Role == "user" ? "justify-content-end" : "")">
+                        @if (msg.Role == "assistant")
+                        {
+                            <div class="avatar bg-teal text-white rounded-circle me-2" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+                                🤖
+                            </div>
+                        }
+                        
+                        <div class="chat-bubble @msg.Role @(msg.Role == "user" ? "bg-navy text-white" : "bg-white text-navy") p-3 shadow-sm border-0" 
+                             style="border-radius: 18px; @(msg.Role == "user" ? "border-top-right-radius: 4px;" : "border-top-left-radius: 4px;") max-width: 80%; line-height: 1.5; white-space: pre-wrap;">
+                            @FilterOutJson(msg.Content)
+                            
+                            @if (!string.IsNullOrEmpty(msg.PhotoUrl))
+                            {
+                                <div class="mt-3 border rounded overflow-hidden shadow-sm" style="max-width: 200px;">
+                                    <img src="@msg.PhotoUrl" class="img-fluid" alt="Attached issues image" />
+                                </div>
+                            }
+                        </div>
+                        
+                        @if (msg.Role == "user")
+                        {
+                            <div class="avatar bg-teal-light text-teal rounded-circle ms-2" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                                @userInitials
+                            </div>
+                        }
+                    </div>
+                }
+                
+                @if (showPhotoUploadZone)
+                {
+                    <div class="chat-message-row d-flex mb-3">
+                        <div class="avatar bg-teal text-white rounded-circle me-2" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+                            🤖
+                        </div>
+                        <div class="chat-bubble bot bg-white text-navy p-4 shadow-sm border-0" style="border-radius: 18px; border-top-left-radius: 4px; max-width: 80%; width: 100%;">
+                            <div class="upload-zone text-center p-3" style="border: 2px dashed var(--color-teal); background-color: rgba(13, 148, 136, 0.03); border-radius: 12px;">
+                                <i class="bi bi-cloud-arrow-up-fill fs-2 text-teal"></i>
+                                <h6 class="mt-2 text-navy fw-bold">Attach an Issue Photo</h6>
+                                <p class="small text-muted mb-3">Helps property manager inspect concern</p>
+                                
+                                @if (isUploadingFile)
+                                {
+                                    <div class="spinner-border text-teal spinner-border-sm" role="status"></div>
+                                    <span class="small text-muted ms-2">Uploading photo...</span>
+                                }
+                                else if (!string.IsNullOrEmpty(uploadedPhotoPath))
+                                {
+                                    <div class="d-flex align-items-center justify-content-center bg-teal-light p-2 rounded mb-2">
+                                        <i class="bi bi-image text-teal me-2"></i>
+                                        <span class="small text-navy text-truncate" style="max-width: 150px;">Photo Attached!</span>
+                                        <button class="btn btn-link btn-sm text-danger p-0 ms-auto" @onclick="RemoveUploadedPhoto"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <InputFile OnChange="HandleFileUpload" class="form-control form-control-sm" accept="image/*" />
+                                }
+                            </div>
+                        </div>
                     </div>
                 }
                 
                 @if (isTyping)
                 {
-                    <div class="chat-bubble bot">
-                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
-                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
-                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
+                    <div class="chat-message-row d-flex mb-3">
+                        <div class="avatar bg-teal text-white rounded-circle me-2" style="width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0;">
+                            🤖
+                        </div>
+                        <div class="chat-bubble bot bg-white text-navy p-3 shadow-sm border-0 d-flex align-items-center" style="border-radius: 18px; border-top-left-radius: 4px;">
+                            <span class="spinner-grow spinner-grow-sm text-teal me-1" role="status" aria-hidden="true"></span>
+                            <span class="spinner-grow spinner-grow-sm text-teal me-1" role="status" aria-hidden="true"></span>
+                            <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
+                        </div>
                     </div>
                 }
             </div>
             
-            <div class="chat-input-area">
-                <div class="input-group">
-                    <input type="text" class="form-control" placeholder="Describe your issue..." @bind="userInput" @onkeyup="HandleKeyUp" disabled="@isTyping">
-                    <button class="btn btn-primary px-4" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(userInput) || isTyping)">
+            <div class="chat-input-area p-3 bg-white border-top d-flex align-items-center flex-column" style="border-bottom-left-radius: 16px; border-bottom-right-radius: 16px;">
+                @if (isTicketDrafted && draftedTicket != null)
+                {
+                    <div class="w-100 bg-teal-light p-3 rounded mb-3 shadow-sm border animate-fade-in" style="border-color: rgba(13, 148, 136, 0.2) !important;">
+                        <h6 class="text-teal fw-bold mb-2"><i class="bi bi-clipboard2-check-fill me-2"></i>Maintenance Ticket Drafted!</h6>
+                        <div class="row text-navy small mb-2">
+                            <div class="col-6"><strong>Category:</strong> @draftedTicket.Category</div>
+                            <div class="col-6">
+                                <strong>Urgency:</strong> 
+                                @if (draftedTicket.Urgency == 1) { <span class="badge bg-success">Minor</span> }
+                                else if (draftedTicket.Urgency == 2) { <span class="badge bg-warning text-dark">Moderate</span> }
+                                else { <span class="badge bg-danger">Emergency</span> }
+                            </div>
+                        </div>
+                        <div class="text-navy small mb-3"><strong>Description:</strong> @draftedTicket.Description</div>
+                        
+                        <button class="btn btn-teal w-100 fw-bold py-2 shadow-sm" @onclick="SubmitDraftedTicket" disabled="@isSubmittingTicket">
+                            @if (isSubmittingTicket)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-circle-fill me-2"></i>
+                            }
+                            Confirm & Submit Ticket
+                        </button>
+                    </div>
+                }
+                
+                <div class="input-group w-100">
+                    <input type="text" class="form-control py-2 border-end-0" style="border-radius: 10px 0 0 10px;" placeholder="@(isTicketDrafted ? "Ticket drafted! Click Confirm to save." : "Describe your issue here...")" 
+                           @bind="userInput" @onkeyup="HandleKeyUp" disabled="@(isTyping || isTicketDrafted)">
+                    <button class="btn btn-primary px-4" style="border-radius: 0 10px 10px 0;" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(userInput) || isTyping || isTicketDrafted)">
                         <i class="bi bi-send-fill"></i>
                     </button>
                 </div>
@@ -51,64 +156,181 @@
         </div>
     </div>
     
+    <!-- RIGHT: My Tickets Table Grid (40% width) -->
     <div class="col-lg-5 mb-4">
-        <div class="form-card h-100">
-            <h4 class="mb-4">My Tickets</h4>
+        <div class="form-card h-100 shadow-sm d-flex flex-column" style="border-radius: 16px; overflow: hidden;">
+            <div class="p-3 bg-white border-bottom">
+                <h4 class="mb-0 text-navy fw-bold"><i class="bi bi-clipboard2-data me-2 text-teal"></i>My Tickets</h4>
+            </div>
             
-            @if (tickets == null)
-            {
-                <LoadingSpinner />
-            }
-            else if (!tickets.Any())
-            {
-                <div class="text-center py-5 text-muted">
-                    <i class="bi bi-clipboard2-check fs-1"></i>
-                    <p class="mt-3">You don't have any maintenance tickets.</p>
-                </div>
-            }
-            else
-            {
-                <div class="list-group list-group-flush">
-                    @foreach (var ticket in tickets)
-                    {
-                        <div class="list-group-item px-0 py-3">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <strong>Ticket #@ticket.Id</strong>
-                                @if (ticket.Status == "Open")
+            <div class="flex-grow-1 overflow-auto p-3" style="max-height: 520px; background-color: var(--color-light);">
+                @if (tickets == null)
+                {
+                    <LoadingSpinner />
+                }
+                else if (!tickets.Any())
+                {
+                    <div class="text-center py-5 text-muted h-100 d-flex flex-column align-items-center justify-content-center">
+                        <i class="bi bi-clipboard2-check fs-1 text-teal opacity-50 mb-3"></i>
+                        <h6 class="fw-bold">No maintenance tickets</h6>
+                        <p class="small text-muted">Use the AI bot to draft and submit tickets.</p>
+                    </div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle bg-white rounded shadow-sm overflow-hidden" style="border: 1px solid rgba(0,0,0,0.05);">
+                            <thead class="bg-navy text-white text-uppercase small">
+                                <tr>
+                                    <th class="ps-3 py-3" style="width: 10%;">#</th>
+                                    <th style="width: 30%;">Category</th>
+                                    <th style="width: 25%;">Urgency</th>
+                                    <th style="width: 20%;">Status</th>
+                                    <th class="pe-3" style="width: 15%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var ticket in tickets)
                                 {
-                                    <span class="badge-pending">Open</span>
+                                    var isExpanded = expandedTicketId == ticket.Id;
+                                    <tr class="cursor-pointer" @onclick="() => ToggleRow(ticket.Id)" style="border-bottom: 1px solid rgba(0,0,0,0.05);">
+                                        <td class="ps-3 fw-bold text-muted py-3">@ticket.Id</td>
+                                        <td class="fw-bold text-navy">@ticket.Category</td>
+                                        <td>
+                                            @if (ticket.Urgency == 1) { <span class="badge bg-success-light text-success rounded-pill px-2">Minor</span> }
+                                            else if (ticket.Urgency == 2) { <span class="badge bg-warning-light text-warning rounded-pill px-2">Moderate</span> }
+                                            else { <span class="badge bg-danger-light text-danger rounded-pill px-2">Emergency</span> }
+                                        </td>
+                                        <td>
+                                            @if (ticket.Status == "Open") { <span class="badge-pending">Open</span> }
+                                            else if (ticket.Status == "InProgress") { <span class="badge bg-primary">In Progress</span> }
+                                            else { <span class="badge-paid">Resolved</span> }
+                                        </td>
+                                        <td class="pe-3 text-end text-muted">
+                                            <i class="bi @(isExpanded ? "bi-chevron-up" : "bi-chevron-down")"></i>
+                                        </td>
+                                    </tr>
+                                    @if (isExpanded)
+                                    {
+                                        <tr class="bg-light" style="pointer-events: none;">
+                                            <td colspan="5" class="p-3 border-0">
+                                                <div class="p-3 bg-white rounded shadow-sm border" style="pointer-events: auto;">
+                                                    <div class="d-flex justify-content-between mb-2">
+                                                        <span class="small text-muted"><i class="bi bi-calendar3 me-1"></i>Date: @ticket.CreatedAt.ToString("MMM dd, yyyy M:mm tt")</span>
+                                                    </div>
+                                                    <h6 class="fw-bold text-navy mb-2">Issue Description:</h6>
+                                                    <p class="small text-muted mb-3 leading-relaxed" style="white-space: pre-wrap;">@ticket.Description</p>
+                                                    
+                                                    @if (!string.IsNullOrEmpty(ticket.PhotoPath))
+                                                    {
+                                                        <h6 class="fw-bold text-navy mb-2">Attached Photo:</h6>
+                                                        <div class="border rounded overflow-hidden shadow-sm hover-zoom-container" style="max-width: 250px;">
+                                                            <img src="@ticket.PhotoPath" class="img-fluid hover-zoom" alt="Submitted issues image" />
+                                                        </div>
+                                                    }
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
                                 }
-                                else if (ticket.Status == "InProgress")
-                                {
-                                    <span class="badge bg-primary">In Progress</span>
-                                }
-                                else
-                                {
-                                    <span class="badge-paid">Resolved</span>
-                                }
-                            </div>
-                            <div class="mb-1 text-truncate">@ticket.Description</div>
-                            <div class="d-flex justify-content-between align-items-center small text-muted">
-                                <span><i class="bi bi-tag me-1"></i>@ticket.Category</span>
-                                <span>@ticket.CreatedAt.ToString("MMM dd, yyyy")</span>
-                            </div>
-                        </div>
-                    }
-                </div>
-            }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
         </div>
     </div>
 </div>
 
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease forwards;
+    }
+    .bg-success-light {
+        background-color: rgba(16, 185, 129, 0.1);
+    }
+    .bg-warning-light {
+        background-color: rgba(245, 158, 11, 0.1);
+    }
+    .bg-danger-light {
+        background-color: rgba(239, 68, 68, 0.1);
+    }
+    .text-warning {
+        color: #d97706 !important;
+    }
+    .hover-zoom-container {
+        overflow: hidden;
+    }
+    .hover-zoom {
+        transition: transform 0.3s ease;
+    }
+    .hover-zoom:hover {
+        transform: scale(1.1);
+    }
+    @@keyframes fadeIn {
+        from { opacity: 0; transform: translateY(5px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
 @code {
     private List<TenantTicketView>? tickets;
-    private List<ChatMessage> messages = new();
+    private List<MessageExchange> messages = new();
     private string userInput = "";
+    private string userInitials = "T";
     private bool isTyping = false;
+    private int? expandedTicketId = null;
+
+    // File upload states
+    private bool showPhotoUploadZone = false;
+    private bool isUploadingFile = false;
+    private string? uploadedPhotoPath = null;
+
+    // Ticket parsing states
+    private bool isTicketDrafted = false;
+    private DraftedTicketInfo? draftedTicket;
+    private bool isSubmittingTicket = false;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadTickets();
+        await FetchTenantInitials();
+        
+        // Add initial system message to start the chatbot context
+        messages.Add(new MessageExchange 
+        { 
+            Role = "system", 
+            Content = "You are RentFlow AI, an intelligent property maintenance assistant. Your goal is to help a tenant report a maintenance problem. " +
+                      "Guide them step-by-step: " +
+                      "1. Ask the user to clarify or expand on the description of the problem they are experiencing. " +
+                      "2. For issues that are visually inspectable (like cracks, water leaks, broken parts, appliance failures), ask for a photo. " +
+                      "To present the photo upload box, you MUST output the exact token `[REQUEST_PHOTO]` in your response. " +
+                      "3. Categorize the issue into one of: 'Plumbing', 'Electrical', 'HVAC', 'Structural', 'Other'. " +
+                      "4. Determine urgency: 1=Minor, 2=Moderate, 3=Emergency. " +
+                      "5. Once you have sufficient details and the photo status is resolved, summarize the issue and output the final ticket specs as a raw JSON block at the very bottom of your message. The JSON MUST use this format EXACTLY: " +
+                      "```json\n{\n  \"category\": \"Plumbing\",\n  \"urgency\": 2,\n  \"description\": \"Kitchen faucet leak under sink causing cabinet wood damage\"\n}\n```\n" +
+                      "Make sure not to write anything else after the JSON code block. Keep your tone polite, professional, and empathetic."
+        });
+    }
+
+    private async Task FetchTenantInitials()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            var name = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Name)?.Value ?? "Tenant";
+            var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0)
+            {
+                userInitials = parts.Length > 1 
+                    ? $"{parts[0][0]}{parts[1][0]}".ToUpper() 
+                    : $"{parts[0][0]}".ToUpper();
+            }
+        }
     }
 
     private async Task LoadTickets()
@@ -116,9 +338,17 @@
         tickets = await MaintenanceService.GetTenantTickets();
     }
 
+    private void ToggleRow(int ticketId)
+    {
+        if (expandedTicketId == ticketId)
+            expandedTicketId = null;
+        else
+            expandedTicketId = ticketId;
+    }
+
     private async Task HandleKeyUp(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter")
+        if (e.Key == "Enter" && !isTyping && !isTicketDrafted)
         {
             await SendMessage();
         }
@@ -126,34 +356,235 @@
 
     private async Task SendMessage()
     {
-        if (string.IsNullOrWhiteSpace(userInput)) return;
+        if (string.IsNullOrWhiteSpace(userInput) || isTyping || isTicketDrafted) return;
 
-        messages.Add(new ChatMessage { Role = "user", Content = userInput });
         var text = userInput;
         userInput = "";
+        
+        messages.Add(new MessageExchange { Role = "user", Content = text });
         isTyping = true;
-        
-        // This is a placeholder for the actual Groq API call integration
-        await Task.Delay(1500); 
-        
-        messages.Add(new ChatMessage { Role = "bot", Content = "I have classified your issue as Plumbing (Urgency: Moderate). A maintenance ticket has been created automatically." });
-        
-        isTyping = false;
-        
-        // Auto create ticket locally as demo
-        await MaintenanceService.CreateTicket(new RentFlow.Shared.DTOs.MaintenanceTicketDto 
-        { 
-            Category = "Plumbing", 
-            Description = text,
-            Urgency = 2 
-        });
-        
-        await LoadTickets();
+        showPhotoUploadZone = false; // Hide upload zone temporarily during bot processing
+        StateHasChanged();
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("ServerAPI");
+            var payload = new
+            {
+                Messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToArray()
+            };
+            
+            var response = await client.PostAsJsonAsync("api/groq/chat", payload);
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                var botMessage = doc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+
+                // Add response to the list
+                var exchange = new MessageExchange 
+                { 
+                    Role = "assistant", 
+                    Content = botMessage,
+                    PhotoUrl = uploadedPhotoPath // Attach photo preview in the bubble if recently uploaded
+                };
+                messages.Add(exchange);
+
+                // Handle Photo Request Token
+                if (botMessage.Contains("[REQUEST_PHOTO]") && string.IsNullOrEmpty(uploadedPhotoPath))
+                {
+                    showPhotoUploadZone = true;
+                }
+
+                // Check for JSON drafted ticket output
+                ParseDraftedTicket(botMessage);
+            }
+            else
+            {
+                messages.Add(new MessageExchange { Role = "assistant", Content = "I encountered an issue communicating with my brain core. Please try again in a moment." });
+            }
+        }
+        catch (Exception ex)
+        {
+            messages.Add(new MessageExchange { Role = "assistant", Content = $"Error processing request: {ex.Message}" });
+        }
+        finally
+        {
+            isTyping = false;
+            StateHasChanged();
+        }
     }
 
-    private class ChatMessage
+    private async Task HandleFileUpload(InputFileChangeEventArgs e)
     {
-        public string Role { get; set; } = "";
-        public string Content { get; set; } = "";
+        var file = e.File;
+        if (file == null) return;
+
+        isUploadingFile = true;
+        StateHasChanged();
+
+        try
+        {
+            var client = HttpClientFactory.CreateClient("ServerAPI");
+            using var content = new MultipartFormDataContent();
+            var streamContent = new StreamContent(file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024)); // Max 10MB
+            streamContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(file.ContentType);
+            
+            content.Add(streamContent, "file", file.Name);
+            
+            var response = await client.PostAsync("api/maintenance/upload", content);
+            if (response.IsSuccessStatusCode)
+            {
+                var responseString = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(responseString);
+                uploadedPhotoPath = doc.RootElement.GetProperty("photoPath").GetString();
+                
+                showPhotoUploadZone = false; // Hide upload block
+                
+                // Add a notification prompt to the chat log to feed into LLM context
+                messages.Add(new MessageExchange 
+                { 
+                    Role = "user", 
+                    Content = $"[Uploaded Photo: {uploadedPhotoPath}] I have attached a photo of the maintenance concern." 
+                });
+                
+                // Trigger next bot message directly
+                isTyping = true;
+                StateHasChanged();
+                
+                var payload = new
+                {
+                    Messages = messages.Select(m => new { role = m.Role, content = m.Content }).ToArray()
+                };
+                
+                var botResponse = await client.PostAsJsonAsync("api/groq/chat", payload);
+                if (botResponse.IsSuccessStatusCode)
+                {
+                    var botContent = await botResponse.Content.ReadAsStringAsync();
+                    using var botDoc = JsonDocument.Parse(botContent);
+                    var botMsg = botDoc.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+                    
+                    messages.Add(new MessageExchange 
+                    { 
+                        Role = "assistant", 
+                        Content = botMsg,
+                        PhotoUrl = uploadedPhotoPath // Render photo preview
+                    });
+
+                    ParseDraftedTicket(botMsg);
+                }
+            }
+            else
+            {
+                ToastService.ShowError("Could not complete file upload onto the server.", "Upload Failure");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"File upload exception: {ex.Message}", "System Error");
+        }
+        finally
+        {
+            isUploadingFile = false;
+            isTyping = false;
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveUploadedPhoto()
+    {
+        uploadedPhotoPath = null;
+        showPhotoUploadZone = true;
+        StateHasChanged();
+    }
+
+    private void ParseDraftedTicket(string content)
+    {
+        var match = Regex.Match(content, @"```json\s*(\{.*?\})\s*```", RegexOptions.Singleline);
+        if (match.Success)
+        {
+            try
+            {
+                var json = match.Groups[1].Value;
+                draftedTicket = JsonSerializer.Deserialize<DraftedTicketInfo>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (draftedTicket != null)
+                {
+                    isTicketDrafted = true;
+                }
+            }
+            catch
+            {
+                // Failed parsing, let conversation continue
+            }
+        }
+    }
+
+    private async Task SubmitDraftedTicket()
+    {
+        if (draftedTicket == null || isSubmittingTicket) return;
+
+        isSubmittingTicket = true;
+        StateHasChanged();
+
+        try
+        {
+            var dto = new MaintenanceTicketDto
+            {
+                Category = draftedTicket.Category,
+                Description = draftedTicket.Description,
+                Urgency = draftedTicket.Urgency,
+                PhotoPath = uploadedPhotoPath
+            };
+
+            var ticketId = await MaintenanceService.CreateTicket(dto);
+            if (ticketId > 0)
+            {
+                ToastService.ShowSuccess($"Ticket #{ticketId} was filed successfully!", "Ticket Submitted");
+                
+                // Reset chatbot conversation
+                messages.RemoveAll(m => m.Role != "system");
+                userInput = "";
+                showPhotoUploadZone = false;
+                uploadedPhotoPath = null;
+                isTicketDrafted = false;
+                draftedTicket = null;
+                
+                // Reload list
+                await LoadTickets();
+            }
+            else
+            {
+                ToastService.ShowError("Server failed creating the ticket. Please try again.", "Submission Error");
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Error: {ex.Message}", "System Failure");
+        }
+        finally
+        {
+            isSubmittingTicket = false;
+            StateHasChanged();
+        }
+    }
+
+    private string FilterOutJson(string text)
+    {
+        // Suppress JSON display inside the chat bubble for a premium visual flow
+        return Regex.Replace(text, @"```json\s*\{.*?\}\s*```", "", RegexOptions.Singleline).Replace("[REQUEST_PHOTO]", "").Trim();
+    }
+
+    private class MessageExchange
+    {
+        public string Role { get; set; } = string.Empty;
+        public string Content { get; set; } = string.Empty;
+        public string? PhotoUrl { get; set; }
+    }
+
+    private class DraftedTicketInfo
+    {
+        public string Category { get; set; } = string.Empty;
+        public int Urgency { get; set; }
+        public string Description { get; set; } = string.Empty;
     }
 }

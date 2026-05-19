@@ -17,3 +17,10 @@ window.getLocation = () => {
         }
     });
 };
+
+window.initMapIframe = (iframeId, lat, lng) => {
+    const iframe = document.getElementById(iframeId);
+    if (iframe) {
+        iframe.src = `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
+    }
+};

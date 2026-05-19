@@ -30,7 +30,11 @@ namespace RentFlow.Server.Controllers
 
             var encodedAddress = System.Uri.EscapeDataString(address);
             var url = $"https://maps.googleapis.com/maps/api/geocode/json?address={encodedAddress}&key={apiKey}";
-
+            
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            }
             var response = await _httpClient.GetAsync(url);
             if (!response.IsSuccessStatusCode)
                 return StatusCode((int)response.StatusCode, "Failed to geocode address.");

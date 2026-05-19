@@ -156,5 +156,42 @@ namespace RentFlow.Server.Controllers
 
             return Ok(new { lease.Id });
         }
+
+        [HttpGet("tenant")]
+        public async Task<IActionResult> GetTenantLease()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var role = User.FindFirstValue(ClaimTypes.Role);
+
+            if (role != "Tenant")
+                return Forbid();
+
+            var lease = await _context.Leases
+                .Include(l => l.Unit)
+                .ThenInclude(u => u.Property)
+                .ThenInclude(p => p.Landlord)
+                .FirstOrDefaultAsync(l => l.TenantId == userId && l.IsActive);
+
+            if (lease == null)
+                return NotFound("No active lease found.");
+
+            var dto = new TenantLeaseDto
+            {
+                LeaseId = lease.Id,
+                UnitNumber = lease.Unit.UnitNumber,
+                PropertyName = lease.Unit.Property.Name,
+                PropertyAddress = lease.Unit.Property.Address,
+                PropertyCity = lease.Unit.Property.City,
+                Latitude = lease.Unit.Property.Latitude,
+                Longitude = lease.Unit.Property.Longitude,
+                MonthlyRent = lease.MonthlyRent,
+                StartDate = lease.StartDate,
+                EndDate = lease.EndDate,
+                LandlordName = lease.Unit.Property.Landlord.FullName,
+                LandlordEmail = lease.Unit.Property.Landlord.Email
+            };
+
+            return Ok(dto);
+        }
     }
 }

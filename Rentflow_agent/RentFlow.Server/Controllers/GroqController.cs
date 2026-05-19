@@ -31,7 +31,7 @@ namespace RentFlow.Server.Controllers
 
             var groqRequest = new
             {
-                model = "llama3-8b-8192", // Use a fast LLaMA 3 model on Groq
+                model = "llama-3.1-8b-instant", // Use a fast LLaMA 3.1 model on Groq
                 messages = request.Messages,
                 temperature = 0.5,
                 max_tokens = 1024
@@ -40,6 +40,10 @@ namespace RentFlow.Server.Controllers
             var jsonContent = new StringContent(JsonSerializer.Serialize(groqRequest), Encoding.UTF8, "application/json");
             
             _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+            if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
+            {
+                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            }
             var response = await _httpClient.PostAsync("https://api.groq.com/openai/v1/chat/completions", jsonContent);
 
             if (!response.IsSuccessStatusCode)
