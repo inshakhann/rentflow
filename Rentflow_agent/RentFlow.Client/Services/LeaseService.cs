@@ -43,6 +43,18 @@ namespace RentFlow.Client.Services
                 return null;
             }
         }
+
+        public async Task<LeaseCountdownData?> GetLeaseCountdown()
+        {
+            try { return await _httpClient.GetFromJsonAsync<LeaseCountdownData>("api/leases/tenant/countdown"); }
+            catch { return null; }
+        }
+
+        public async Task<List<OccupancyMonth>?> GetOccupancyHeatmap()
+        {
+            try { return await _httpClient.GetFromJsonAsync<List<OccupancyMonth>>("api/leases/landlord/occupancy-heatmap"); }
+            catch { return new List<OccupancyMonth>(); }
+        }
     }
 
     public class AvailableTenantView
@@ -50,5 +62,18 @@ namespace RentFlow.Client.Services
         public int Id { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+    }
+
+    public class LeaseCountdownData
+    {
+        public int DaysRemaining { get; set; }
+        public int TotalDays { get; set; }
+        public DateTime? EndDate { get; set; }
+    }
+
+    public class OccupancyMonth
+    {
+        public int Month { get; set; }
+        public int Occupancy { get; set; }
     }
 }

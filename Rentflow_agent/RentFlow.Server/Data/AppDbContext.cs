@@ -16,6 +16,7 @@ namespace RentFlow.Server.Data
         public DbSet<Payment> Payments { get; set; } = null!;
         public DbSet<MaintenanceTicket> MaintenanceTickets { get; set; } = null!;
         public DbSet<WeatherAlertLog> WeatherAlertLogs { get; set; } = null!;
+        public DbSet<Notification> Notifications { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

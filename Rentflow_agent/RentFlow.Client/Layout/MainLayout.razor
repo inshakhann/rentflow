@@ -2,6 +2,8 @@
 @inject NavigationManager NavigationManager
 @inject AuthService AuthService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+@inject NotificationService NotificationService
 
 <div class="app-container">
     <div class="sidebar">
@@ -25,22 +27,28 @@
     <div class="main-content">
         <div class="top-header">
             <h5 class="m-0">@PageTitle</h5>
-            <div class="ms-auto d-flex align-items-center">
+            <div class="ms-auto d-flex align-items-center gap-3">
+                
+                <button class="dark-toggle-btn" @onclick="ToggleDarkMode" title="Toggle Dark Mode">
+                    <i class="bi @(isDarkMode ? "bi-moon-stars-fill" : "bi-sun-fill")"></i>
+                </button>
+
                 @if (Role == "Landlord" || Role == "Tenant")
                 {
-                    <button class="btn btn-link p-0 me-3 position-relative text-amber" @onclick="ToggleWeatherAlerts">
+                    <button class="btn btn-link p-0 position-relative text-navy" @onclick="ToggleNotificationDrawer">
                         <i class="bi bi-bell-fill fs-5"></i>
-                        @if (HasUnreadAlerts)
+                        @if (unreadCount > 0)
                         {
-                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
-                                <span class="visually-hidden">New alerts</span>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                                @unreadCount
+                                <span class="visually-hidden">unread messages</span>
                             </span>
                         }
                     </button>
                 }
                 
-                <span class="me-3">@UserName</span>
-                <button class="btn btn-sm btn-outline-danger" @onclick="Logout">Logout</button>
+                <span class="fw-bold">@UserName</span>
+                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" @onclick="Logout">Logout</button>
             </div>
         </div>
 
@@ -55,14 +63,69 @@
     </div>
 </div>
 
+<!-- Notification Drawer -->
+@if (isDrawerOpen)
+{
+    <div class="notification-overlay" @onclick="ToggleNotificationDrawer"></div>
+}
+<div class="notification-drawer @(isDrawerOpen ? "open" : "")">
+    <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+        <h5 class="m-0 fw-bold text-navy"><i class="bi bi-bell me-2"></i>Notifications</h5>
+        <div>
+            @if (unreadCount > 0)
+            {
+                <button class="btn btn-sm btn-link text-teal p-0 me-3" @onclick="MarkAllAsRead">Mark all read</button>
+            }
+            <button class="btn-close" @onclick="ToggleNotificationDrawer"></button>
+        </div>
+    </div>
+    <div class="flex-grow-1 overflow-auto p-0">
+        @if (notifications == null)
+        {
+            <div class="p-4 text-center"><span class="spinner-border text-teal spinner-border-sm"></span></div>
+        }
+        else if (!notifications.Any())
+        {
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-bell-slash fs-1 d-block mb-2"></i>
+                <small>No notifications yet</small>
+            </div>
+        }
+        else
+        {
+            <div class="list-group list-group-flush">
+                @foreach (var n in notifications)
+                {
+                    <div class="list-group-item list-group-item-action p-3 @(n.IsRead ? "" : "bg-light border-start border-teal border-4")" style="cursor: pointer;" @onclick="() => MarkAsRead(n)">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <strong class="@(n.IsRead ? "text-muted" : "text-navy")">@n.Title</strong>
+                            <small class="text-muted" style="font-size: 0.7rem;">@n.CreatedAt.ToString("MMM dd")</small>
+                        </div>
+                        <p class="mb-0 small text-muted">@n.Message</p>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
 <ToastContainer />
 
 @code {
     public string Role { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
     public string PageTitle { get; set; } = "Dashboard";
+    
+    // Weather
     public bool ShowWeatherAlerts { get; set; }
-    public bool HasUnreadAlerts { get; set; }
+
+    // Dark Mode
+    private bool isDarkMode = false;
+
+    // Notifications
+    private bool isDrawerOpen = false;
+    private List<NotificationView>? notifications;
+    private int unreadCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -73,13 +136,65 @@
         {
             Role = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
             UserName = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Name)?.Value ?? "";
+            
+            if (Role == "Landlord" || Role == "Tenant")
+            {
+                await LoadNotifications();
+            }
         }
     }
 
-    private void ToggleWeatherAlerts()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        ShowWeatherAlerts = !ShowWeatherAlerts;
-        HasUnreadAlerts = false; // Mark as read locally for now
+        if (firstRender)
+        {
+            var theme = await JSRuntime.InvokeAsync<string>("applyStoredTheme");
+            isDarkMode = theme == "dark";
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleDarkMode()
+    {
+        var nextTheme = await JSRuntime.InvokeAsync<string>("toggleDarkMode");
+        isDarkMode = nextTheme == "dark";
+    }
+
+    private async Task LoadNotifications()
+    {
+        notifications = await NotificationService.GetNotifications();
+        if (notifications != null)
+        {
+            unreadCount = notifications.Count(n => !n.IsRead);
+        }
+    }
+
+    private void ToggleNotificationDrawer()
+    {
+        isDrawerOpen = !isDrawerOpen;
+    }
+
+    private async Task MarkAsRead(NotificationView n)
+    {
+        if (!n.IsRead)
+        {
+            n.IsRead = true;
+            unreadCount--;
+            await NotificationService.MarkAsRead(n.Id);
+        }
+    }
+
+    private async Task MarkAllAsRead()
+    {
+        if (notifications != null)
+        {
+            foreach (var n in notifications.Where(n => !n.IsRead))
+            {
+                n.IsRead = true;
+            }
+            unreadCount = 0;
+            await NotificationService.MarkAllAsRead();
+        }
     }
 
     private async Task Logout()
@@ -88,3 +203,4 @@
         NavigationManager.NavigateTo("/login");
     }
 }
+

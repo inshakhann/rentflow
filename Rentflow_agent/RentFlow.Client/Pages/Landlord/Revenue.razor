@@ -5,6 +5,7 @@
 @inject PropertyService PropertyService
 @inject PaymentService PaymentService
 @inject ToastService ToastService
+@inject HttpClient Http
 
 <PageTitle>Financial Analytics</PageTitle>
 
@@ -13,6 +14,9 @@
         <h2 class="text-navy fw-bold mb-0">Financial Analytics</h2>
         <small class="text-muted">Real-time revenue metrics, YTD ledger, and monthly rent charts</small>
     </div>
+    <button class="btn btn-teal rounded-pill px-4" @onclick="OpenReportModal">
+        <i class="bi bi-file-earmark-pdf-fill me-2"></i>Export Report
+    </button>
 </div>
 
 @if (isLoading)
@@ -136,6 +140,154 @@ else
             </div>
         </div>
     </div>
+
+    <!-- Export Report Modal -->
+    @if (showReportModal)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header bg-navy text-white" style="border-top-left-radius: 20px; border-top-right-radius: 20px;">
+                        <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-pdf-fill me-2"></i>Generate Monthly Financial Report</h5>
+                        <button type="button" class="btn-close btn-close-white" @onclick="CloseReportModal"></button>
+                    </div>
+                    <div class="modal-body p-4">
+                        <div class="row mb-4">
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-navy">Month</label>
+                                <select class="form-select" @bind="selectedMonth">
+                                    @for (int m = 1; m <= 12; m++)
+                                    {
+                                        <option value="@m">@(new DateTime(2020, m, 1).ToString("MMMM"))</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label fw-bold text-navy">Year</label>
+                                <select class="form-select" @bind="selectedYear">
+                                    @for (int y = DateTime.UtcNow.Year - 3; y <= DateTime.UtcNow.Year + 1; y++)
+                                    {
+                                        <option value="@y">@y</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex align-items-end">
+                                <button class="btn btn-teal w-100 fw-bold" @onclick="FetchReport" disabled="@isFetchingReport">
+                                    @if (isFetchingReport)
+                                    {
+                                        <span class="spinner-border spinner-border-sm"></span>
+                                    }
+                                    else
+                                    {
+                                        <span>Load</span>
+                                    }
+                                </button>
+                            </div>
+                        </div>
+
+                        @if (reportData != null)
+                        {
+                            <div class="p-4 border rounded-3 bg-light shadow-inner mb-3">
+                                <h5 class="fw-bold text-navy border-bottom pb-2 mb-3">Report Preview: @(new DateTime(2020, reportData.Month, 1).ToString("MMMM")) @reportData.Year</h5>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2"><strong>Total Income:</strong> Rs @reportData.TotalIncome.ToString("N0")</div>
+                                    <div class="col-md-6 mb-2"><strong>Late Penalties:</strong> Rs @reportData.TotalLateFees.ToString("N0")</div>
+                                    <div class="col-md-6 mb-2"><strong>Paid Invoices:</strong> @reportData.PaidPayments</div>
+                                    <div class="col-md-6 mb-2"><strong>Late Invoices:</strong> @reportData.LatePayments</div>
+                                    <div class="col-md-6 mb-2"><strong>Open Maintenance Tickets:</strong> @reportData.OpenTickets</div>
+                                    <div class="col-md-6 mb-2"><strong>Occupancy Rate:</strong> @reportData.OccupancyRate%</div>
+                                </div>
+                            </div>
+
+                            <button class="btn btn-outline-navy w-100 fw-bold" @onclick="PrintReport">
+                                <i class="bi bi-printer me-2"></i>Print / Export to PDF
+                            </button>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5 text-muted">
+                                <i class="bi bi-info-circle fs-1 opacity-50 mb-2 d-block"></i>
+                                Select Month and Year, then click Load to preview report.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Hidden Printable Monthly Report -->
+    @if (reportData != null)
+    {
+        <div id="printable-monthly-report" class="d-none">
+            <div class="text-center mb-5 border-bottom pb-4">
+                <h2>RentFlow Monthly Report</h2>
+                <h4 class="text-muted">@(new DateTime(2020, reportData.Month, 1).ToString("MMMM")) @reportData.Year</h4>
+                <p class="small text-muted">Generated on @DateTime.UtcNow.ToString("MMM dd, yyyy M:mm tt")</p>
+            </div>
+            <div class="row mb-5">
+                <div class="col-6">
+                    <h5>Portfolio Status</h5>
+                    <strong>Total Units:</strong> @reportData.TotalUnits<br />
+                    <strong>Occupied Units:</strong> @reportData.OccupiedUnits<br />
+                    <strong>Occupancy Rate:</strong> @reportData.OccupancyRate%
+                </div>
+                <div class="col-6 text-end">
+                    <h5>Maintenance Status</h5>
+                    <strong>Active Open Tickets:</strong> @reportData.OpenTickets
+                </div>
+            </div>
+            <table class="table table-bordered mb-5">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Financial Category</th>
+                        <th class="text-end">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Total Income Collected</td>
+                        <td class="text-end">Rs @reportData.TotalIncome.ToString("N0")</td>
+                    </tr>
+                    <tr>
+                        <td>Late Fees / Penalties Surcharged</td>
+                        <td class="text-end">Rs @reportData.TotalLateFees.ToString("N0")</td>
+                    </tr>
+                    <tr class="table-secondary fw-bold">
+                        <td>Total Portfolio Revenue</td>
+                        <td class="text-end">Rs @((reportData.TotalIncome + reportData.TotalLateFees).ToString("N0"))</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Invoice Status</th>
+                        <th class="text-end">Count</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Paid Invoices</td>
+                        <td class="text-end">@reportData.PaidPayments</td>
+                    </tr>
+                    <tr>
+                        <td>Pending Invoices</td>
+                        <td class="text-end">@reportData.PendingPayments</td>
+                    </tr>
+                    <tr>
+                        <td>Late / Overdue Invoices</td>
+                        <td class="text-end text-danger">@reportData.LatePayments</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="text-center mt-5 pt-5 border-top">
+                <p class="small text-muted">RentFlow Compliant Property Management System Portal</p>
+            </div>
+        </div>
+    }
 }
 
 <style>
@@ -160,6 +312,13 @@ else
     private List<LatePaymentItem>? latePayments;
     private List<PropertyView>? properties;
     private bool isLoading = true;
+
+    // Report Generation States
+    private bool showReportModal = false;
+    private bool isFetchingReport = false;
+    private int selectedMonth = DateTime.UtcNow.Month;
+    private int selectedYear = DateTime.UtcNow.Year;
+    private MonthlyReportResponse? reportData;
 
     // Computed Stats
     private int totalUnits = 0;
@@ -205,5 +364,61 @@ else
             var data = revenue.Select(r => r.Total).ToArray();
             await JSRuntime.InvokeVoidAsync("renderBarChart", "fullRevenueChart", labels, data);
         }
+    }
+
+    private void OpenReportModal()
+    {
+        reportData = null;
+        selectedMonth = DateTime.UtcNow.Month;
+        selectedYear = DateTime.UtcNow.Year;
+        showReportModal = true;
+    }
+
+    private void CloseReportModal()
+    {
+        showReportModal = false;
+    }
+
+    private async Task FetchReport()
+    {
+        isFetchingReport = true;
+        StateHasChanged();
+        try
+        {
+            reportData = await Http.GetFromJsonAsync<MonthlyReportResponse>($"api/report/monthly?month={selectedMonth}&year={selectedYear}");
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError($"Failed to fetch report: {ex.Message}");
+        }
+        finally
+        {
+            isFetchingReport = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task PrintReport()
+    {
+        if (reportData != null)
+        {
+            await Task.Delay(100);
+            await JSRuntime.InvokeVoidAsync("printReceipt"); // Reusing same print js func
+        }
+    }
+
+    public class MonthlyReportResponse
+    {
+        public int Month { get; set; }
+        public int Year { get; set; }
+        public decimal TotalIncome { get; set; }
+        public decimal TotalLateFees { get; set; }
+        public int PaidPayments { get; set; }
+        public int PendingPayments { get; set; }
+        public int LatePayments { get; set; }
+        public int OpenTickets { get; set; }
+        public double OccupancyRate { get; set; }
+        public int TotalUnits { get; set; }
+        public int OccupiedUnits { get; set; }
     }
 }

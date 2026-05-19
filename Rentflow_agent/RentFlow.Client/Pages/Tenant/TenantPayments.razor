@@ -3,6 +3,9 @@
 @attribute [Authorize(Roles = "Tenant")]
 @inject PaymentService PaymentService
 @inject ToastService ToastService
+@inject IJSRuntime JSRuntime
+@using System.Net.Http.Json
+@inject HttpClient Http
 
 <PageTitle>Payment History</PageTitle>
 
@@ -72,7 +75,7 @@ else
                                 }
                                 else
                                 {
-                                    <button class="btn btn-sm btn-outline-navy fw-bold px-3 py-2 rounded-pill hover-scale" @onclick="ShowReceiptInfo">
+                                    <button class="btn btn-sm btn-outline-navy fw-bold px-3 py-2 rounded-pill hover-scale" @onclick="() => PrintReceipt(payment.Id)">
                                         <i class="bi bi-receipt me-1"></i>Receipt
                                     </button>
                                 }
@@ -92,6 +95,72 @@ else
             </table>
         </div>
     </div>
+
+    <!-- QR Code Section -->
+    <div class="row mt-4 mb-5">
+        <div class="col-md-6 offset-md-3">
+            <div class="qr-code-container animate-fade-in shadow-sm">
+                <h5 class="fw-bold text-teal mb-3"><i class="bi bi-qr-code-scan me-2"></i>Quick Pay via QR Code</h5>
+                <p class="text-muted small mb-4">Scan this code with your banking app or digital wallet to instantly navigate to the payment portal.</p>
+                <div id="qr-code-render-target" class="mb-2">
+                    <span class="spinner-border text-teal spinner-border-sm" role="status"></span>
+                </div>
+                <small class="text-teal fw-bold">@qrPaymentUrl</small>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Hidden Printable Receipt -->
+@if (receipt != null)
+{
+    <div id="printable-receipt" class="d-none">
+        <div class="text-center mb-4 border-bottom pb-4">
+            <h2>RentFlow Receipt</h2>
+            <p class="text-muted">Official Payment Record</p>
+        </div>
+        <div class="row mb-4">
+            <div class="col-6">
+                <strong>Tenant:</strong> @receipt.TenantName<br />
+                <strong>Email:</strong> @receipt.TenantEmail
+            </div>
+            <div class="col-6 text-end">
+                <strong>Property:</strong> @receipt.PropertyName<br />
+                <strong>Unit:</strong> @receipt.UnitNumber
+            </div>
+        </div>
+        <table class="table table-bordered mb-4">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th class="text-end">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Monthly Rent (Due @receipt.DueDate.ToString("MMM dd, yyyy"))</td>
+                    <td class="text-end">Rs @receipt.Amount.ToString("N0")</td>
+                </tr>
+                @if (receipt.LateFee > 0)
+                {
+                    <tr>
+                        <td>Late Fee</td>
+                        <td class="text-end">Rs @receipt.LateFee.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr class="fw-bold">
+                    <td class="text-end">Total Paid</td>
+                    <td class="text-end">Rs @receipt.Total.ToString("N0")</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div class="text-center mt-5">
+            <p>Paid on @(receipt.PaidDate?.ToString("MMM dd, yyyy M:mm tt"))</p>
+            <p class="small text-muted">Thank you for your prompt payment.</p>
+        </div>
+    </div>
 }
 
 <style>
@@ -101,20 +170,59 @@ else
     .hover-scale:hover {
         transform: translateY(-1px);
     }
+    .qr-code-container {
+        border: 2px dashed var(--color-teal);
+        border-radius: 16px;
+        padding: 20px;
+        text-align: center;
+        background: var(--color-teal-light);
+    }
+    @@media print {
+        .d-none#printable-receipt {
+            display: block !important;
+        }
+    }
 </style>
 
 @code {
     private List<TenantPaymentHistory>? payments;
     private bool isProcessingPayment = false;
+    private ReceiptData? receipt;
+    private string qrPaymentUrl = "";
+    private string qrBase64 = "";
 
     protected override async Task OnInitializedAsync()
     {
         await LoadHistory();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadQrCode();
+        }
+    }
+
     private async Task LoadHistory()
     {
         payments = await PaymentService.GetTenantHistory();
+    }
+
+    private async Task LoadQrCode()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<QrCodeResponse>("api/qrcode/tenant");
+            if (response != null)
+            {
+                qrBase64 = response.QrBase64;
+                qrPaymentUrl = response.PaymentUrl;
+                await JSRuntime.InvokeVoidAsync("renderQrImage", "qr-code-render-target", qrBase64);
+                StateHasChanged();
+            }
+        }
+        catch { /* ignore qr errors */ }
     }
 
     private async Task ProcessPayment(int paymentId)
@@ -147,8 +255,22 @@ else
         }
     }
 
-    private void ShowReceiptInfo()
+    private async Task PrintReceipt(int paymentId)
     {
-        ToastService.ShowInfo("Receipt printed successfully. Your invoice check details are up to date.", "Receipt Generated");
+        receipt = await PaymentService.GetReceiptData(paymentId);
+        StateHasChanged();
+        
+        if (receipt != null)
+        {
+            // Give DOM a tick to render the hidden receipt html
+            await Task.Delay(100);
+            await JSRuntime.InvokeVoidAsync("printReceipt");
+        }
+    }
+
+    public class QrCodeResponse
+    {
+        public string QrBase64 { get; set; } = "";
+        public string PaymentUrl { get; set; } = "";
     }
 }

@@ -33,5 +33,6 @@ builder.Services.AddScoped<MaintenanceService>();
 builder.Services.AddScoped<GeolocationService>();
 builder.Services.AddScoped<LeaseService>();
 builder.Services.AddScoped<WeatherService>();
+builder.Services.AddScoped<NotificationService>();
 
 await builder.Build().RunAsync();

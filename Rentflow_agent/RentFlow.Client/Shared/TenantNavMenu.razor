@@ -1,3 +1,5 @@
+@inject RentFlow.Client.Services.PaymentService PaymentService
+
 <div class="nav flex-column">
     <NavLink class="nav-link p-2 mb-1 rounded" href="tenant/dashboard" Match="NavLinkMatch.All">
         <i class="bi bi-speedometer2 me-2"></i> Dashboard
@@ -7,8 +9,28 @@
     </NavLink>
     <NavLink class="nav-link p-2 mb-1 rounded" href="tenant/payments">
         <i class="bi bi-credit-card me-2"></i> Payment History
+        @if (isDueSoon)
+        {
+            <span class="rent-due-pulse" title="Rent is due within 3 days!"></span>
+        }
+    </NavLink>
+    <NavLink class="nav-link p-2 mb-1 rounded" href="tenant/negotiate">
+        <i class="bi bi-robot me-2"></i> Rent Negotiation
     </NavLink>
     <NavLink class="nav-link p-2 mb-1 rounded" href="tenant/unit">
         <i class="bi bi-house me-2"></i> My Unit
     </NavLink>
 </div>
+
+@code {
+    private bool isDueSoon = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var status = await PaymentService.GetDueStatus();
+        if (status != null)
+        {
+            isDueSoon = status.IsDueSoon;
+        }
+    }
+}

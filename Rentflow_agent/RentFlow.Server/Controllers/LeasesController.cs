@@ -193,5 +193,65 @@ namespace RentFlow.Server.Controllers
 
             return Ok(dto);
         }
+
+        [HttpGet("tenant/countdown")]
+        [Authorize(Roles = "Tenant")]
+        public async Task<IActionResult> GetLeaseCountdown()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var lease = await _context.Leases
+                .Where(l => l.TenantId == userId)
+                .OrderByDescending(l => l.StartDate)
+                .FirstOrDefaultAsync();
+
+            if (lease == null || !lease.EndDate.HasValue)
+                return Ok(new { daysRemaining = -1, totalDays = 0, endDate = (DateTime?)null });
+
+            var totalDays = (lease.EndDate.Value - lease.StartDate).TotalDays;
+            var daysRemaining = (lease.EndDate.Value - DateTime.UtcNow.Date).Days;
+            if (daysRemaining < 0) daysRemaining = 0;
+
+            return Ok(new { daysRemaining, totalDays = (int)totalDays, endDate = lease.EndDate });
+        }
+
+        [HttpGet("landlord/occupancy-heatmap")]
+        [Authorize(Roles = "Landlord")]
+        public async Task<IActionResult> GetOccupancyHeatmap()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var properties = await _context.Properties
+                .Include(p => p.Units)
+                .Where(p => p.LandlordId == userId)
+                .ToListAsync();
+
+            var unitIds = properties.SelectMany(p => p.Units).Select(u => u.Id).ToList();
+            var totalUnits = unitIds.Count;
+
+            if (totalUnits == 0)
+                return Ok(Enumerable.Range(0, 12).Select(i => new { month = i + 1, occupancy = 0 }));
+
+            var leases = await _context.Leases
+                .Where(l => unitIds.Contains(l.UnitId))
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            var result = Enumerable.Range(0, 12).Select(i =>
+            {
+                var monthDate = new DateTime(now.Year, 1, 1).AddMonths(i);
+                var monthStart = monthDate;
+                var monthEnd = monthDate.AddMonths(1).AddDays(-1);
+
+                var occupiedCount = leases.Count(l =>
+                    l.StartDate <= monthEnd &&
+                    (!l.EndDate.HasValue || l.EndDate.Value >= monthStart));
+
+                var pct = (int)Math.Round((double)occupiedCount / totalUnits * 100);
+                return new { month = i + 1, occupancy = pct };
+            });
+
+            return Ok(result);
+        }
     }
 }

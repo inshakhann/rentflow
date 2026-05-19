@@ -111,5 +111,68 @@ namespace RentFlow.Server.Controllers
 
             return Ok();
         }
+
+        [HttpGet("tenant/receipt/{id}")]
+        public async Task<IActionResult> GetReceipt(int id)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var receipt = await _context.Payments
+                .Include(p => p.Lease).ThenInclude(l => l.Unit).ThenInclude(u => u.Property)
+                .Include(p => p.Tenant)
+                .Where(p => p.Id == id && p.TenantId == userId && p.Status == "Paid")
+                .Select(p => new
+                {
+                    p.Id,
+                    TenantName = p.Tenant.FullName,
+                    TenantEmail = p.Tenant.Email,
+                    PropertyName = p.Lease.Unit.Property.Name,
+                    UnitNumber = p.Lease.Unit.UnitNumber,
+                    p.Amount,
+                    p.LateFee,
+                    Total = p.Amount + p.LateFee,
+                    p.PaidDate,
+                    p.DueDate
+                })
+                .FirstOrDefaultAsync();
+
+            if (receipt == null) return NotFound();
+            return Ok(receipt);
+        }
+
+        [HttpGet("tenant/due-status")]
+        public async Task<IActionResult> GetDueStatus()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var nextPending = await _context.Payments
+                .Where(p => p.TenantId == userId && (p.Status == "Pending" || p.Status == "Late"))
+                .OrderBy(p => p.DueDate)
+                .FirstOrDefaultAsync();
+
+            if (nextPending == null)
+                return Ok(new { isDueSoon = false, daysUntilDue = -1 });
+
+            var daysUntil = (nextPending.DueDate - System.DateTime.UtcNow.Date).Days;
+            return Ok(new { isDueSoon = daysUntil <= 3, daysUntilDue = daysUntil });
+        }
+
+        [HttpGet("score/{tenantId}")]
+        [Authorize(Roles = "Landlord")]
+        public async Task<IActionResult> GetPaymentScore(int tenantId)
+        {
+            var payments = await _context.Payments
+                .Where(p => p.TenantId == tenantId && p.Status == "Paid")
+                .ToListAsync();
+
+            if (!payments.Any())
+                return Ok(new { score = 100, label = "New" });
+
+            // On-time = paid before or on due date
+            var onTime = payments.Count(p => p.PaidDate.HasValue && p.PaidDate.Value.Date <= p.DueDate.Date);
+            var score = (int)System.Math.Round((double)onTime / payments.Count * 100);
+
+            return Ok(new { score, label = score >= 90 ? "Excellent" : score >= 70 ? "Good" : score >= 50 ? "Fair" : "Poor" });
+        }
     }
 }

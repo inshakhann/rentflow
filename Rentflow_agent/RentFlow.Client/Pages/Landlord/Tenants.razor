@@ -5,6 +5,7 @@
 @inject PropertyService PropertyService
 @inject LeaseService LeaseService
 @inject ToastService ToastService
+@inject PaymentService PaymentService
 
 <PageTitle>My Tenants</PageTitle>
 
@@ -38,13 +39,14 @@ else
                         <th>Lease Period</th>
                         <th>Monthly Rent</th>
                         <th>Payment Status</th>
+                        <th>Payment Score</th>
                     </tr>
                 </thead>
                 <tbody>
                     @if (leases == null || !leases.Any())
                     {
                         <tr>
-                            <td colspan="7" class="text-center py-5 text-muted">
+                            <td colspan="8" class="text-center py-5 text-muted">
                                 <i class="bi bi-people-fill text-muted fs-1 d-block mb-3"></i>
                                 No active tenant tenancies registered. Click Invite Tenant to get started!
                             </td>
@@ -83,6 +85,19 @@ else
                                     else
                                     {
                                         <span class="badge bg-secondary text-white rounded-pill px-3 py-1 fw-bold">@lease.PaymentStatus</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (tenantScores.TryGetValue(lease.TenantId, out var scoreData))
+                                    {
+                                        var badgeClass = scoreData.Score >= 90 ? "bg-success" : scoreData.Score >= 70 ? "bg-info text-white" : scoreData.Score >= 50 ? "bg-warning text-dark" : "bg-danger text-white";
+                                        <span class="badge @badgeClass rounded-pill px-3 py-2 fw-bold">
+                                            @scoreData.Score% (@scoreData.Label)
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="spinner-border spinner-border-sm text-muted"></span>
                                     }
                                 </td>
                             </tr>
@@ -210,6 +225,7 @@ else
     private List<AvailableTenantView>? availableTenants;
     private List<PropertyView>? properties;
     private List<UnitView>? vacantUnits;
+    private Dictionary<int, PaymentScoreData> tenantScores = new();
 
     // Invitation Form Model
     private CreateLeaseDto inviteModel = new() { StartDate = DateTime.Today, EndDate = DateTime.Today.AddYears(1) };
@@ -225,6 +241,20 @@ else
     private async Task LoadLeases()
     {
         leases = await LeaseService.GetLandlordLeases();
+        if (leases != null)
+        {
+            foreach (var lease in leases)
+            {
+                if (!tenantScores.ContainsKey(lease.TenantId))
+                {
+                    var scoreData = await PaymentService.GetPaymentScore(lease.TenantId);
+                    if (scoreData != null)
+                    {
+                        tenantScores[lease.TenantId] = scoreData;
+                    }
+                }
+            }
+        }
     }
 
     private async Task OpenInviteModal()
