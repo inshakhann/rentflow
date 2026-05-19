@@ -104,9 +104,9 @@
         if (user.Identity?.IsAuthenticated == true)
         {
             var role = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
-            if (role == "Admin") NavigationManager.NavigateTo("/admin/dashboard", true);
-            else if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard", true);
-            else if (role == "Tenant") NavigationManager.NavigateTo("/tenant/dashboard", true);
+            if (role == "Admin") NavigationManager.NavigateTo("/admin/dashboard");
+            else if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard");
+            else if (role == "Tenant") NavigationManager.NavigateTo("/tenant/dashboard");
         }
     }
 
@@ -134,8 +134,8 @@
         if (role != null)
         {
             ToastService.ShowSuccess("Registration successful!");
-            if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard", true);
-            else NavigationManager.NavigateTo("/tenant/dashboard", true);
+            if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard");
+            else NavigationManager.NavigateTo("/tenant/dashboard");
             return;
         }
 
