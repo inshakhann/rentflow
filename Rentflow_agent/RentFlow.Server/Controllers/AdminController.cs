@@ -193,7 +193,18 @@ namespace RentFlow.Server.Controllers
         [HttpPost("weather/trigger-check")]
         public async Task<IActionResult> TriggerWeatherCheck()
         {
-            var apiKey = ApiKeyResolver.Resolve(_configuration, "OpenWeatherMap:ApiKey", "OPENWEATHERMAP_API_KEY", "WEATHERMAP_API_KEY");
+            var weatherApiComKey = ApiKeyResolver.Resolve(
+                _configuration,
+                "WeatherApi:ApiKey",
+                "WEATHERAPI_COM_API_KEY",
+                "WEATHERAPI_API_KEY");
+
+            var openWeatherMapKey = ApiKeyResolver.Resolve(
+                _configuration,
+                "OpenWeatherMap:ApiKey",
+                "OPENWEATHERMAP_API_KEY",
+                "WEATHERMAP_API_KEY");
+
             var properties = await _context.Properties
                 .Where(p => p.Latitude.HasValue && p.Longitude.HasValue)
                 .ToListAsync();
@@ -203,9 +214,14 @@ namespace RentFlow.Server.Controllers
                 return Ok(new { Added = 0, Checked = 0, Message = "No properties with coordinates found." });
             }
 
-            if (string.IsNullOrWhiteSpace(apiKey))
+            if (string.IsNullOrWhiteSpace(weatherApiComKey) && string.IsNullOrWhiteSpace(openWeatherMapKey))
             {
-                return StatusCode(500, new { Added = 0, Checked = properties.Count, Message = "Weather API key is missing. Configure OpenWeatherMap:ApiKey or OPENWEATHERMAP_API_KEY." });
+                return StatusCode(500, new
+                {
+                    Added = 0,
+                    Checked = properties.Count,
+                    Message = "Weather API key is missing. Configure WeatherApi:ApiKey/WEATHERAPI_COM_API_KEY or OpenWeatherMap:ApiKey/OPENWEATHERMAP_API_KEY."
+                });
             }
 
             var client = _httpClientFactory.CreateClient();
@@ -219,36 +235,28 @@ namespace RentFlow.Server.Controllers
                 checkedCount++;
                 var lat = property.Latitude!.Value;
                 var lon = property.Longitude!.Value;
-                var url = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={apiKey}&units=metric";
 
-                WeatherSnapshot? weather;
-                try
-                {
-                    weather = await client.GetFromJsonAsync<WeatherSnapshot>(url);
-                }
-                catch
+                var weather = await GetUnifiedWeatherSnapshot(client, lat, lon, weatherApiComKey, openWeatherMapKey);
+                if (weather == null)
                 {
                     failedChecks++;
                     continue;
                 }
 
-                if (weather == null || weather.Main == null)
-                    continue;
-
-                var conditionText = weather.Weather?.FirstOrDefault()?.Main?.ToLowerInvariant() ?? string.Empty;
+                var conditionText = weather.ConditionText.ToLowerInvariant();
                 var alertsToAdd = new System.Collections.Generic.List<(string Type, string Message)>();
 
-                if (weather.Main.Temp <= 3)
+                if (weather.TemperatureC <= 3)
                 {
                     alertsToAdd.Add(("Freeze", "Freezing temperatures detected. Protect exposed pipes and check heating systems."));
                 }
 
-                if (weather.Main.Temp >= 40)
+                if (weather.TemperatureC >= 40)
                 {
                     alertsToAdd.Add(("Heatwave", "Extreme heat warning. Inspect cooling systems and hydration points."));
                 }
 
-                if (weather.Wind?.Speed >= 13 || conditionText.Contains("storm") || conditionText.Contains("thunder"))
+                if (weather.WindSpeedMps >= 13 || conditionText.Contains("storm") || conditionText.Contains("thunder"))
                 {
                     alertsToAdd.Add(("Storm", "Storm risk detected. Secure loose outdoor objects and inspect roof drainage."));
                 }
@@ -285,26 +293,105 @@ namespace RentFlow.Server.Controllers
             });
         }
 
-        private sealed class WeatherSnapshot
+        private async Task<UnifiedWeatherSnapshot?> GetUnifiedWeatherSnapshot(
+            HttpClient client,
+            double lat,
+            double lon,
+            string? weatherApiComKey,
+            string? openWeatherMapKey)
         {
-            public MainSnapshot? Main { get; set; }
-            public WindSnapshot? Wind { get; set; }
-            public System.Collections.Generic.List<ConditionSnapshot>? Weather { get; set; }
+            if (!string.IsNullOrWhiteSpace(weatherApiComKey))
+            {
+                var weatherApiUrl = $"https://api.weatherapi.com/v1/current.json?key={weatherApiComKey}&q={lat},{lon}&aqi=no";
+                try
+                {
+                    var weatherApiResponse = await client.GetFromJsonAsync<WeatherApiCurrentResponse>(weatherApiUrl);
+                    if (weatherApiResponse?.Current != null)
+                    {
+                        return new UnifiedWeatherSnapshot
+                        {
+                            TemperatureC = weatherApiResponse.Current.TempC,
+                            WindSpeedMps = weatherApiResponse.Current.WindKph / 3.6,
+                            ConditionText = weatherApiResponse.Current.Condition?.Text ?? string.Empty
+                        };
+                    }
+                }
+                catch
+                {
+                    // fallback to OpenWeatherMap if configured
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(openWeatherMapKey))
+            {
+                var openWeatherUrl = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={openWeatherMapKey}&units=metric";
+                try
+                {
+                    var openWeatherResponse = await client.GetFromJsonAsync<OpenWeatherSnapshot>(openWeatherUrl);
+                    if (openWeatherResponse?.Main != null)
+                    {
+                        return new UnifiedWeatherSnapshot
+                        {
+                            TemperatureC = openWeatherResponse.Main.Temp,
+                            WindSpeedMps = openWeatherResponse.Wind?.Speed ?? 0,
+                            ConditionText = openWeatherResponse.Weather?.FirstOrDefault()?.Main ?? string.Empty
+                        };
+                    }
+                }
+                catch
+                {
+                    // no provider left
+                }
+            }
+
+            return null;
         }
 
-        private sealed class MainSnapshot
+        private sealed class UnifiedWeatherSnapshot
+        {
+            public double TemperatureC { get; set; }
+            public double WindSpeedMps { get; set; }
+            public string ConditionText { get; set; } = string.Empty;
+        }
+
+        private sealed class WeatherApiCurrentResponse
+        {
+            public WeatherApiCurrent? Current { get; set; }
+        }
+
+        private sealed class WeatherApiCurrent
+        {
+            public double TempC { get; set; }
+            public double WindKph { get; set; }
+            public WeatherApiCondition? Condition { get; set; }
+        }
+
+        private sealed class WeatherApiCondition
+        {
+            public string? Text { get; set; }
+        }
+
+        private sealed class OpenWeatherSnapshot
+        {
+            public OpenWeatherMain? Main { get; set; }
+            public OpenWeatherWind? Wind { get; set; }
+            public System.Collections.Generic.List<OpenWeatherCondition>? Weather { get; set; }
+        }
+
+        private sealed class OpenWeatherMain
         {
             public double Temp { get; set; }
         }
 
-        private sealed class WindSnapshot
+        private sealed class OpenWeatherWind
         {
             public double Speed { get; set; }
         }
 
-        private sealed class ConditionSnapshot
+        private sealed class OpenWeatherCondition
         {
             public string? Main { get; set; }
         }
+
     }
 }

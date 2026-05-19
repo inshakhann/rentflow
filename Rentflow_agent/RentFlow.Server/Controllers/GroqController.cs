@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +18,7 @@ namespace RentFlow.Server.Controllers
     [Route("api/[controller]")]
     public class GroqController : ControllerBase
     {
+        private static int _apiKeyCursor = -1;
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
         private readonly ILogger<GroqController> _logger;
@@ -52,43 +54,81 @@ namespace RentFlow.Server.Controllers
 
         private async Task<string?> CallGroq(IReadOnlyList<ChatMessage> messages, string purpose)
         {
-            var apiKey = ResolveGroqApiKey();
-            if (string.IsNullOrEmpty(apiKey)) return null;
+            var apiKeys = ResolveGroqApiKeys();
+            if (apiKeys.Count == 0) return null;
 
             var models = ResolveModels(purpose);
             var lastError = string.Empty;
+            var orderedKeys = OrderApiKeys(apiKeys);
 
             foreach (var model in models)
             {
-                var groqRequest = new
+                for (var keyIndex = 0; keyIndex < orderedKeys.Count; keyIndex++)
                 {
-                    model,
-                    messages = messages.Select(m => new { role = m.Role, content = m.Content }),
-                    temperature = 0.3,
-                    max_tokens = 1300
-                };
+                    var apiKey = orderedKeys[keyIndex];
+                    var groqRequest = new
+                    {
+                        model,
+                        messages = messages.Select(m => new { role = m.Role, content = m.Content }),
+                        temperature = 0.3,
+                        max_tokens = 1300
+                    };
 
-                using var requestMessage = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
-                requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
-                requestMessage.Headers.TryAddWithoutValidation("User-Agent", "RentFlow/1.0");
-                requestMessage.Content = new StringContent(JsonSerializer.Serialize(groqRequest), Encoding.UTF8, "application/json");
+                    using var requestMessage = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Post, "https://api.groq.com/openai/v1/chat/completions");
+                    requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+                    requestMessage.Headers.TryAddWithoutValidation("User-Agent", "RentFlow/1.0");
+                    requestMessage.Content = new StringContent(JsonSerializer.Serialize(groqRequest), Encoding.UTF8, "application/json");
 
-                var response = await _httpClient.SendAsync(requestMessage);
-                if (response.IsSuccessStatusCode)
-                {
-                    return await response.Content.ReadAsStringAsync();
+                    var response = await _httpClient.SendAsync(requestMessage);
+                    if (response.IsSuccessStatusCode)
+                    {
+                        return await response.Content.ReadAsStringAsync();
+                    }
+
+                    lastError = await response.Content.ReadAsStringAsync();
+                    _logger.LogWarning(
+                        "Groq request failed for model {Model} using key slot {KeySlot}/{KeyCount}. Status={StatusCode}. Body={Body}",
+                        model,
+                        keyIndex + 1,
+                        orderedKeys.Count,
+                        (int)response.StatusCode,
+                        lastError);
                 }
-
-                lastError = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Groq request failed for model {Model}. Status={StatusCode}. Body={Body}", model, (int)response.StatusCode, lastError);
             }
 
             return null;
         }
 
-        private string? ResolveGroqApiKey()
+        private IReadOnlyList<string> ResolveGroqApiKeys()
         {
-            return ApiKeyResolver.Resolve(_config, "Groq:ApiKey", "GROQ_API_KEY", "GROK_API_KEY", "XAI_API_KEY");
+            var many = ApiKeyResolver.ResolveMany(
+                _config,
+                "Groq:ApiKeys",
+                "GROQ_API_KEYS",
+                "GROK_API_KEYS");
+
+            var single = ApiKeyResolver.Resolve(_config, "Groq:ApiKey", "GROQ_API_KEY", "GROK_API_KEY", "XAI_API_KEY");
+            var all = many.ToList();
+            if (!string.IsNullOrWhiteSpace(single))
+            {
+                all.Add(single);
+            }
+
+            return all
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
+
+        private static IReadOnlyList<string> OrderApiKeys(IReadOnlyList<string> keys)
+        {
+            if (keys.Count <= 1)
+                return keys;
+
+            var start = Math.Abs(Interlocked.Increment(ref _apiKeyCursor)) % keys.Count;
+            return Enumerable.Range(0, keys.Count)
+                .Select(i => keys[(start + i) % keys.Count])
+                .ToList();
         }
 
         [HttpPost("negotiate")]

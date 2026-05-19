@@ -32,22 +32,49 @@ namespace RentFlow.Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetWeather([FromQuery] double lat, [FromQuery] double lon)
         {
-            var apiKey = ApiKeyResolver.Resolve(_config, "OpenWeatherMap:ApiKey", "OPENWEATHERMAP_API_KEY", "WEATHERMAP_API_KEY");
-            if (string.IsNullOrEmpty(apiKey))
+            var weatherApiComKey = ApiKeyResolver.Resolve(
+                _config,
+                "WeatherApi:ApiKey",
+                "WEATHERAPI_COM_API_KEY",
+                "WEATHERAPI_API_KEY");
+
+            var openWeatherMapKey = ApiKeyResolver.Resolve(
+                _config,
+                "OpenWeatherMap:ApiKey",
+                "OPENWEATHERMAP_API_KEY",
+                "WEATHERMAP_API_KEY");
+
+            if (string.IsNullOrEmpty(weatherApiComKey) && string.IsNullOrEmpty(openWeatherMapKey))
                 return StatusCode(500, "Weather API key not configured.");
 
-            var url = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={apiKey}&units=metric";
-            
             if (!_httpClient.DefaultRequestHeaders.Contains("User-Agent"))
             {
                 _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
             }
-            var response = await _httpClient.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
-                return StatusCode((int)response.StatusCode, "Failed to fetch weather data.");
 
-            var data = await response.Content.ReadAsStringAsync();
-            return Content(data, "application/json");
+            if (!string.IsNullOrEmpty(weatherApiComKey))
+            {
+                var weatherApiUrl = $"https://api.weatherapi.com/v1/current.json?key={weatherApiComKey}&q={lat},{lon}&aqi=no";
+                var weatherApiResponse = await _httpClient.GetAsync(weatherApiUrl);
+                if (weatherApiResponse.IsSuccessStatusCode)
+                {
+                    var weatherApiData = await weatherApiResponse.Content.ReadAsStringAsync();
+                    return Content(weatherApiData, "application/json");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(openWeatherMapKey))
+            {
+                var openWeatherMapUrl = $"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={openWeatherMapKey}&units=metric";
+                var openWeatherResponse = await _httpClient.GetAsync(openWeatherMapUrl);
+                if (openWeatherResponse.IsSuccessStatusCode)
+                {
+                    var openWeatherData = await openWeatherResponse.Content.ReadAsStringAsync();
+                    return Content(openWeatherData, "application/json");
+                }
+            }
+
+            return StatusCode(502, "Failed to fetch weather data from configured providers.");
         }
 
         [HttpGet("landlord/alerts")]
