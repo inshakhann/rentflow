@@ -7,6 +7,7 @@ using RentFlow.Server.Data;
 using Microsoft.Extensions.Configuration;
 using System.Net.Http.Json;
 using RentFlow.Shared.Models;
+using RentFlow.Server.Services;
 
 namespace RentFlow.Server.Controllers
 {
@@ -192,7 +193,7 @@ namespace RentFlow.Server.Controllers
         [HttpPost("weather/trigger-check")]
         public async Task<IActionResult> TriggerWeatherCheck()
         {
-            var apiKey = _configuration["OpenWeatherMap:ApiKey"];
+            var apiKey = ApiKeyResolver.Resolve(_configuration, "OpenWeatherMap:ApiKey", "OPENWEATHERMAP_API_KEY", "WEATHERMAP_API_KEY");
             var properties = await _context.Properties
                 .Where(p => p.Latitude.HasValue && p.Longitude.HasValue)
                 .ToListAsync();
@@ -202,15 +203,16 @@ namespace RentFlow.Server.Controllers
                 return Ok(new { Added = 0, Checked = 0, Message = "No properties with coordinates found." });
             }
 
-            if (string.IsNullOrWhiteSpace(apiKey) || apiKey.StartsWith("YOUR_", System.StringComparison.OrdinalIgnoreCase))
+            if (string.IsNullOrWhiteSpace(apiKey))
             {
-                return Ok(new { Added = 0, Checked = properties.Count, Message = "Weather API key is not configured. Dry run completed." });
+                return StatusCode(500, new { Added = 0, Checked = properties.Count, Message = "Weather API key is missing. Configure OpenWeatherMap:ApiKey or OPENWEATHERMAP_API_KEY." });
             }
 
             var client = _httpClientFactory.CreateClient();
             var now = System.DateTime.UtcNow;
             var addedCount = 0;
             var checkedCount = 0;
+            var failedChecks = 0;
 
             foreach (var property in properties)
             {
@@ -226,6 +228,7 @@ namespace RentFlow.Server.Controllers
                 }
                 catch
                 {
+                    failedChecks++;
                     continue;
                 }
 
@@ -272,7 +275,14 @@ namespace RentFlow.Server.Controllers
             }
 
             await _context.SaveChangesAsync();
-            return Ok(new { Added = addedCount, Checked = checkedCount, Message = $"Weather check completed. {addedCount} alerts added across {checkedCount} properties." });
+            return Ok(new
+            {
+                Added = addedCount,
+                Checked = checkedCount,
+                Failed = failedChecks,
+                Message = $"Weather check completed. {addedCount} alerts added across {checkedCount} properties." +
+                          (failedChecks > 0 ? $" {failedChecks} API request(s) failed." : string.Empty)
+            });
         }
 
         private sealed class WeatherSnapshot

@@ -21,6 +21,7 @@ namespace RentFlow.Shared.DTOs
     public class CreateLeaseDto
     {
         public int UnitId { get; set; }
+        public string TenantName { get; set; } = string.Empty;
         public string TenantEmail { get; set; } = string.Empty;
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }

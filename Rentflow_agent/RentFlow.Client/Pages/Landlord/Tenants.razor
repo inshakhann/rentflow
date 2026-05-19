@@ -123,16 +123,29 @@ else
                     <!-- Available Tenants List Dropdown -->
                     <div class="mb-3">
                         <label class="form-label text-muted small fw-bold">Registered Renter</label>
-                        <select class="form-select p-3 bg-light border-0" @bind="inviteModel.TenantEmail" required>
-                            <option value="">-- Choose Tenant Email --</option>
+                        <input class="form-control p-3 bg-light border-0"
+                               type="email"
+                               list="registeredTenants"
+                               @bind="inviteModel.TenantEmail"
+                               placeholder="Type email or pick from list" />
+                        <datalist id="registeredTenants">
                             @if (availableTenants != null)
                             {
                                 @foreach (var tenant in availableTenants)
                                 {
-                                    <option value="@tenant.Email">@tenant.FullName (@tenant.Email)</option>
+                                    <option value="@tenant.Email">@tenant.FullName (@(tenant.IsCurrentlyAssignedToYou ? "Already assigned to your portfolio" : "Available"))</option>
                                 }
                             }
-                        </select>
+                        </datalist>
+                        <small class="text-muted">You can assign existing tenants or use a new email to auto-create a tenant account.</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Tenant Full Name (required for new email)</label>
+                        <input class="form-control p-3 bg-light border-0"
+                               type="text"
+                               @bind="inviteModel.TenantName"
+                               placeholder="e.g. Omar Siddiqui" />
                     </div>
 
                     <!-- Property Dropdown -->
@@ -333,8 +346,8 @@ else
 
         try
         {
-            var success = await LeaseService.CreateLease(inviteModel);
-            if (success)
+            var result = await LeaseService.CreateLease(inviteModel);
+            if (result.Success)
             {
                 ToastService.ShowSuccess("Tenant assigned and lease created successfully!");
                 showInviteModal = false;
@@ -342,7 +355,10 @@ else
             }
             else
             {
-                ToastService.ShowError("Failed to assign tenant. Make sure they don't have active leases.");
+                var msg = string.IsNullOrWhiteSpace(result.Message)
+                    ? "Failed to assign tenant. Please verify tenant/unit details."
+                    : result.Message;
+                ToastService.ShowError(msg);
             }
         }
         catch (Exception)

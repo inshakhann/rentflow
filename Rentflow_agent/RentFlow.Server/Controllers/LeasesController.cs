@@ -2,9 +2,11 @@ using System;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 using RentFlow.Server.Data;
 using RentFlow.Shared.DTOs;
 using RentFlow.Shared.Models;
@@ -62,18 +64,22 @@ namespace RentFlow.Server.Controllers
         [HttpGet("available-tenants")]
         public async Task<IActionResult> GetAvailableTenants()
         {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var role = User.FindFirstValue(ClaimTypes.Role);
             if (role != "Landlord")
                 return Forbid();
 
-            // Fetch tenants who don't have an active lease
-            var activeTenantIds = await _context.Leases
+            var activeLeaseData = await _context.Leases
                 .Where(l => l.IsActive)
-                .Select(l => l.TenantId)
+                .Select(l => new { l.TenantId, LandlordId = l.Unit.Property.LandlordId })
                 .ToListAsync();
 
-            var availableTenants = await _context.Users
-                .Where(u => u.Role == "Tenant" && !activeTenantIds.Contains(u.Id))
+            var activeByTenant = activeLeaseData
+                .GroupBy(x => x.TenantId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.LandlordId).Distinct().ToList());
+
+            var tenantUsers = await _context.Users
+                .Where(u => u.Role == "Tenant" && u.IsActive)
                 .Select(u => new
                 {
                     u.Id,
@@ -81,6 +87,23 @@ namespace RentFlow.Server.Controllers
                     u.Email
                 })
                 .ToListAsync();
+
+            var availableTenants = tenantUsers
+                .Select(t =>
+                {
+                    var landlordIds = activeByTenant.TryGetValue(t.Id, out var ids) ? ids : new List<int>();
+                    return new
+                    {
+                        t.Id,
+                        t.FullName,
+                        t.Email,
+                        IsCurrentlyAssignedToYou = landlordIds.Contains(userId),
+                        HasActiveLeaseWithAnotherLandlord = landlordIds.Any(id => id != userId)
+                    };
+                })
+                .Where(t => !t.HasActiveLeaseWithAnotherLandlord)
+                .OrderBy(t => t.FullName)
+                .ToList();
 
             return Ok(availableTenants);
         }
@@ -94,20 +117,36 @@ namespace RentFlow.Server.Controllers
             if (role != "Landlord")
                 return Forbid();
 
+            if (string.IsNullOrWhiteSpace(dto.TenantEmail))
+                return BadRequest("Tenant email is required.");
+
+            if (dto.UnitId <= 0)
+                return BadRequest("A valid unit must be selected.");
+
             // Find tenant by email
+            var normalizedEmail = dto.TenantEmail.Trim().ToLowerInvariant();
             var tenant = await _context.Users
-                .FirstOrDefaultAsync(u => u.Email.ToLower() == dto.TenantEmail.ToLower() && u.Role == "Tenant");
+                .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail && u.Role == "Tenant");
 
             if (tenant == null)
             {
-                return BadRequest("Tenant not found with the provided email address.");
-            }
+                if (string.IsNullOrWhiteSpace(dto.TenantName))
+                    return BadRequest("New tenant full name is required when using an unregistered email.");
 
-            // Check if tenant already has an active lease
-            var hasActiveLease = await _context.Leases.AnyAsync(l => l.TenantId == tenant.Id && l.IsActive);
-            if (hasActiveLease)
-            {
-                return BadRequest("This tenant already has an active lease.");
+                tenant = new User
+                {
+                    FullName = dto.TenantName.Trim(),
+                    Email = normalizedEmail,
+                    Role = "Tenant",
+                    IsActive = true
+                };
+
+                var hasher = new PasswordHasher<User>();
+                var tempPassword = $"RentFlow@{Random.Shared.Next(100000, 999999)}";
+                tenant.PasswordHash = hasher.HashPassword(tenant, tempPassword);
+
+                _context.Users.Add(tenant);
+                await _context.SaveChangesAsync();
             }
 
             // Find unit and make sure landlord owns it
@@ -123,6 +162,25 @@ namespace RentFlow.Server.Controllers
             if (unit.IsOccupied)
             {
                 return BadRequest("This unit is already occupied.");
+            }
+
+            // If tenant already has an active lease, allow reassignment only within this landlord portfolio.
+            var activeLease = await _context.Leases
+                .Include(l => l.Unit)
+                .ThenInclude(u => u.Property)
+                .FirstOrDefaultAsync(l => l.TenantId == tenant.Id && l.IsActive);
+
+            if (activeLease != null)
+            {
+                if (activeLease.Unit.Property.LandlordId != userId)
+                    return BadRequest("This tenant already has an active lease with another landlord.");
+
+                activeLease.IsActive = false;
+                activeLease.EndDate = dto.StartDate.AddDays(-1);
+
+                var previousUnit = await _context.Units.FirstOrDefaultAsync(u => u.Id == activeLease.UnitId);
+                if (previousUnit != null)
+                    previousUnit.IsOccupied = false;
             }
 
             // Create lease

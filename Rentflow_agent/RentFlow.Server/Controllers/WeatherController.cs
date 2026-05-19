@@ -9,6 +9,7 @@ using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using RentFlow.Server.Data;
 using RentFlow.Shared.Models;
+using RentFlow.Server.Services;
 
 namespace RentFlow.Server.Controllers
 {
@@ -31,7 +32,7 @@ namespace RentFlow.Server.Controllers
         [HttpGet]
         public async Task<IActionResult> GetWeather([FromQuery] double lat, [FromQuery] double lon)
         {
-            var apiKey = _config["OpenWeatherMap:ApiKey"];
+            var apiKey = ApiKeyResolver.Resolve(_config, "OpenWeatherMap:ApiKey", "OPENWEATHERMAP_API_KEY", "WEATHERMAP_API_KEY");
             if (string.IsNullOrEmpty(apiKey))
                 return StatusCode(500, "Weather API key not configured.");
 

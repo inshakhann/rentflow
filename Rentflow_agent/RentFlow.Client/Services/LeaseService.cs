@@ -26,10 +26,20 @@ namespace RentFlow.Client.Services
             return await _httpClient.GetFromJsonAsync<List<AvailableTenantView>>("api/leases/available-tenants");
         }
 
-        public async Task<bool> CreateLease(CreateLeaseDto dto)
+        public async Task<LeaseOperationResult> CreateLease(CreateLeaseDto dto)
         {
             var response = await _httpClient.PostAsJsonAsync("api/leases", dto);
-            return response.IsSuccessStatusCode;
+            if (response.IsSuccessStatusCode)
+            {
+                return new LeaseOperationResult { Success = true };
+            }
+
+            var error = await response.Content.ReadAsStringAsync();
+            return new LeaseOperationResult
+            {
+                Success = false,
+                Message = string.IsNullOrWhiteSpace(error) ? "Unable to create lease." : error
+            };
         }
 
         public async Task<TenantLeaseDto?> GetTenantLease()
@@ -62,6 +72,14 @@ namespace RentFlow.Client.Services
         public int Id { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string Email { get; set; } = string.Empty;
+        public bool IsCurrentlyAssignedToYou { get; set; }
+        public bool HasActiveLeaseWithAnotherLandlord { get; set; }
+    }
+
+    public class LeaseOperationResult
+    {
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 
     public class LeaseCountdownData

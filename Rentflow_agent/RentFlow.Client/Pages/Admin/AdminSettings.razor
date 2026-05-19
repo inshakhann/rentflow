@@ -70,6 +70,12 @@
             return;
         }
 
+        if (!result.IsSuccess)
+        {
+            ToastService.ShowError(result.Message, "Weather Check Failed");
+            return;
+        }
+
         if (!string.IsNullOrWhiteSpace(result.Message))
         {
             ToastService.ShowInfo(result.Message);

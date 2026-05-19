@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using RentFlow.Server.Services;
 
 namespace RentFlow.Server.Controllers
 {
@@ -51,7 +52,7 @@ namespace RentFlow.Server.Controllers
 
         private async Task<string?> CallGroq(IReadOnlyList<ChatMessage> messages, string purpose)
         {
-            var apiKey = _config["Groq:ApiKey"];
+            var apiKey = ResolveGroqApiKey();
             if (string.IsNullOrEmpty(apiKey)) return null;
 
             var models = ResolveModels(purpose);
@@ -83,6 +84,11 @@ namespace RentFlow.Server.Controllers
             }
 
             return null;
+        }
+
+        private string? ResolveGroqApiKey()
+        {
+            return ApiKeyResolver.Resolve(_config, "Groq:ApiKey", "GROQ_API_KEY", "GROK_API_KEY", "XAI_API_KEY");
         }
 
         [HttpPost("negotiate")]

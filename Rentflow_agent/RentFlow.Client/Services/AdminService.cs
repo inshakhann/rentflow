@@ -55,9 +55,19 @@ namespace RentFlow.Client.Services
         {
             var response = await _httpClient.PostAsync("api/admin/weather/trigger-check", null);
             if (!response.IsSuccessStatusCode)
-                return null;
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                return new WeatherCheckResult
+                {
+                    Message = string.IsNullOrWhiteSpace(error) ? "Weather check failed." : error,
+                    IsSuccess = false
+                };
+            }
 
-            return await response.Content.ReadFromJsonAsync<WeatherCheckResult>();
+            var result = await response.Content.ReadFromJsonAsync<WeatherCheckResult>();
+            if (result != null)
+                result.IsSuccess = true;
+            return result;
         }
     }
 
@@ -141,6 +151,8 @@ namespace RentFlow.Client.Services
     {
         public int Added { get; set; }
         public int Checked { get; set; }
+        public int Failed { get; set; }
+        public bool IsSuccess { get; set; }
         public string Message { get; set; } = "";
     }
 }
