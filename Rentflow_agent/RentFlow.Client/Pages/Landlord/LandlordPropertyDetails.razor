@@ -6,7 +6,7 @@
 @inject PropertyService PropertyService
 @inject NavigationManager NavigationManager
 @inject ToastService ToastService
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Property Details</PageTitle>
 
@@ -367,7 +367,7 @@ else
             var lon = property.Longitude.Value;
             
             // Try fetching OSM features in background, otherwise instantly fallback
-            var rawJson = await Http.GetStringAsync($"https://overpass-api.de/api/interpreter?data=[out:json];node(around:1000,{lat},{lon})[amenity];out;");
+            var rawJson = await HttpClientFactory.CreateClient().GetStringAsync($"https://overpass-api.de/api/interpreter?data=[out:json];node(around:1000,{lat},{lon})[amenity];out;");
             using var doc = JsonDocument.Parse(rawJson);
             var elements = doc.RootElement.GetProperty("elements");
             
@@ -444,7 +444,7 @@ else
         try
         {
             var req = new { City = suggestCity, Bedrooms = suggestBedrooms, Size = suggestSize };
-            var response = await Http.PostAsJsonAsync("api/groq/suggest-rent", req);
+            var response = await HttpClientFactory.CreateClient("ServerAPI").PostAsJsonAsync("api/groq/suggest-rent", req);
             if (response.IsSuccessStatusCode)
             {
                 var contentStr = await response.Content.ReadAsStringAsync();

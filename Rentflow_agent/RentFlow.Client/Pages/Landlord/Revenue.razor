@@ -5,7 +5,7 @@
 @inject PropertyService PropertyService
 @inject PaymentService PaymentService
 @inject ToastService ToastService
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Financial Analytics</PageTitle>
 
@@ -385,7 +385,7 @@ else
         StateHasChanged();
         try
         {
-            reportData = await Http.GetFromJsonAsync<MonthlyReportResponse>($"api/report/monthly?month={selectedMonth}&year={selectedYear}");
+            reportData = await HttpClientFactory.CreateClient("ServerAPI").GetFromJsonAsync<MonthlyReportResponse>($"api/report/monthly?month={selectedMonth}&year={selectedYear}");
         }
         catch (Exception ex)
         {

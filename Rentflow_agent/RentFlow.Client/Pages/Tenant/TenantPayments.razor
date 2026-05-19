@@ -5,7 +5,7 @@
 @inject ToastService ToastService
 @inject IJSRuntime JSRuntime
 @using System.Net.Http.Json
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>Payment History</PageTitle>
 
@@ -213,7 +213,7 @@ else
     {
         try
         {
-            var response = await Http.GetFromJsonAsync<QrCodeResponse>("api/qrcode/tenant");
+            var response = await HttpClientFactory.CreateClient("ServerAPI").GetFromJsonAsync<QrCodeResponse>("api/qrcode/tenant");
             if (response != null)
             {
                 qrBase64 = response.QrBase64;
