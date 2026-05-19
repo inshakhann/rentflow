@@ -1,51 +1,68 @@
+@page "/"
 @page "/login"
+@layout AuthLayout
 @using RentFlow.Shared.DTOs
 @inject AuthService AuthService
 @inject NavigationManager NavigationManager
 @inject ToastService ToastService
+@inject AuthenticationStateProvider AuthStateProvider
 
-<div class="d-flex align-items-center justify-content-center" style="min-height: 100vh; background-color: var(--color-navy);">
-    <div class="form-card" style="width: 100%; max-width: 480px;">
-        <div class="text-center mb-4">
-            <h1 class="h2 text-navy mb-1">RentFlow</h1>
-            <p class="text-muted">Intelligent Property Management</p>
-        </div>
+<PageTitle>RentFlow Sign In</PageTitle>
 
-        @if (ShowError)
-        {
-            <div class="alert alert-danger p-2 mb-4">
-                Invalid credentials. Please try again.
-            </div>
-        }
+<div class="auth-shell">
+    <div class="auth-card-grid">
+        <section class="auth-brand-panel">
+            <div class="auth-brand-pill">RentFlow Platform</div>
+            <h1>Manage properties with confidence</h1>
+            <p>Unified operations for rent collection, maintenance, alerts, and analytics in one professional workspace.</p>
+            <ul class="auth-feature-list">
+                <li>Role-based dashboards for Admin, Landlord, and Tenant workflows</li>
+                <li>Invoice tracking with late fee automation and receipts</li>
+                <li>Maintenance triage, weather alerts, and AI-assisted support</li>
+            </ul>
+        </section>
 
-        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
-            <DataAnnotationsValidator />
-            
-            <div class="mb-3">
-                <label class="form-label text-muted">Email</label>
-                <InputText @bind-Value="loginModel.Email" class="form-control" placeholder="you@example.com" type="email" required />
-            </div>
+        <section class="auth-form-panel">
+            <h2>Sign In</h2>
+            <p class="auth-subtitle">Welcome back. Please enter your credentials.</p>
 
-            <div class="mb-4">
-                <label class="form-label text-muted">Password</label>
-                <InputText @bind-Value="loginModel.Password" class="form-control" type="password" required />
-            </div>
+            @if (ShowError)
+            {
+                <div class="alert alert-danger py-2 px-3 mb-3">
+                    Invalid credentials. Please try again.
+                </div>
+            }
 
-            <button type="submit" class="btn btn-primary w-100" style="height: 44px;" disabled="@IsLoading">
-                @if (IsLoading)
-                {
-                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                }
-                else
-                {
-                    <span>Sign In</span>
-                }
-            </button>
-            
-            <div class="text-center mt-4">
-                <a href="/register" class="text-decoration-none" style="color: var(--color-teal);">Don't have an account? Register here</a>
-            </div>
-        </EditForm>
+            <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label">Email Address</label>
+                    <InputText @bind-Value="loginModel.Email" class="form-control auth-input" placeholder="you@example.com" type="email" required />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Password</label>
+                    <InputText @bind-Value="loginModel.Password" class="form-control auth-input" type="password" required />
+                </div>
+
+                <button type="submit" class="btn btn-primary auth-submit w-100" disabled="@IsLoading">
+                    @if (IsLoading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Signing in...</span>
+                    }
+                    else
+                    {
+                        <span>Sign In</span>
+                    }
+                </button>
+
+                <div class="text-center mt-4">
+                    <a class="auth-link" href="/register">Create a new account</a>
+                </div>
+            </EditForm>
+        </section>
     </div>
 </div>
 
@@ -54,25 +71,48 @@
     private bool IsLoading = false;
     private bool ShowError = false;
 
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var role = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value;
+            NavigateByRole(role);
+        }
+    }
+
     private async Task HandleLogin()
     {
         IsLoading = true;
         ShowError = false;
-        
+
         var role = await AuthService.Login(loginModel);
-        
+
         if (role != null)
         {
             ToastService.ShowSuccess("Login successful!");
-            
-            if (role == "Admin") NavigationManager.NavigateTo("/admin/dashboard");
-            else if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard");
-            else NavigationManager.NavigateTo("/tenant/dashboard");
+            NavigateByRole(role);
+            return;
         }
-        else
+
+        ShowError = true;
+        IsLoading = false;
+    }
+
+    private void NavigateByRole(string? role)
+    {
+        if (role == "Admin")
         {
-            ShowError = true;
-            IsLoading = false;
+            NavigationManager.NavigateTo("/admin/dashboard", true);
+        }
+        else if (role == "Landlord")
+        {
+            NavigationManager.NavigateTo("/landlord/dashboard", true);
+        }
+        else if (role == "Tenant")
+        {
+            NavigationManager.NavigateTo("/tenant/dashboard", true);
         }
     }
 }
