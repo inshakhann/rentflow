@@ -378,7 +378,7 @@ else
                 var cat = tags.TryGetProperty("amenity", out var am) ? am.GetString() : "service";
                 if (!string.IsNullOrEmpty(name))
                 {
-                    amenities.Add(new AmenityItem { Name = name, Category = cat, Distance = "Within 1 km" });
+                    amenities.Add(new AmenityItem { Name = name, Category = cat ?? "service", Distance = "Within 1 km" });
                 }
             }
         }
