@@ -85,6 +85,7 @@ namespace RentFlow.Server.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "Landlord")]
         public async Task<IActionResult> CreateProperty([FromBody] PropertyDto dto)
         {
             var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
