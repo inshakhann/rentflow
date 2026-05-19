@@ -7,64 +7,155 @@
 <PageTitle>My Properties</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>My Properties</h2>
-    <button class="btn btn-primary" @onclick='() => NavigationManager.NavigateTo("/landlord/properties/add")'>
+    <div>
+        <h2 class="text-navy fw-bold mb-0">My Properties</h2>
+        <small class="text-muted">Manage your real estate holdings and unit listings</small>
+    </div>
+    <button class="btn btn-teal rounded-pill px-4" @onclick='() => NavigationManager.NavigateTo("/landlord/properties/add")'>
         <i class="bi bi-plus-lg me-2"></i>Add Property
     </button>
 </div>
 
+<!-- Search & Filter bar -->
+<div class="row mb-4 animate__animated animate__fadeIn">
+    <div class="col-md-6 col-12">
+        <div class="input-group glass-search-bar shadow-sm">
+            <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control border-0 p-3" placeholder="Search by name, address, or city..." @bind="searchQuery" @bind:event="oninput" />
+        </div>
+    </div>
+</div>
+
 @if (properties == null)
 {
-    <LoadingSpinner />
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+        <LoadingSpinner />
+    </div>
 }
 else
 {
-    <div class="row">
-        @foreach (var prop in properties)
+    <div class="row animate__animated animate__fadeIn">
+        @foreach (var prop in FilteredProperties)
         {
             <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card form-card h-100 cursor-pointer" @onclick="() => ViewProperty(prop.Id)">
-                    <div class="card-body">
+                <div class="card glass-card h-100 cursor-pointer hover-lift border-0 shadow-sm overflow-hidden" @onclick="() => ViewProperty(prop.Id)">
+                    <!-- Decorative color header -->
+                    <div class="property-header-stripe" style="background: @GetOccupancyColor(prop.OccupancyPercent)"></div>
+                    <div class="card-body p-4">
                         <div class="d-flex justify-content-between align-items-start mb-3">
-                            <h4 class="card-title text-navy mb-0">@prop.Name</h4>
-                            <span class="badge bg-teal-light text-teal">@prop.TotalUnits Units</span>
+                            <h4 class="card-title text-navy fw-bold mb-0">@prop.Name</h4>
+                            <span class="badge bg-teal-light text-teal px-3 py-2 rounded-pill fw-bold">@prop.TotalUnits Units</span>
                         </div>
-                        <p class="text-muted mb-4"><i class="bi bi-geo-alt me-2"></i>@prop.Address, @prop.City</p>
                         
-                        <div class="mb-2 d-flex justify-content-between small">
-                            <span>Occupancy</span>
-                            <span class="fw-bold">@(Math.Round(prop.OccupancyPercent))%</span>
-                        </div>
-                        <div class="progress" style="height: 8px;">
-                            <div class="progress-bar bg-teal" role="progressbar" style="width: @prop.OccupancyPercent%"></div>
+                        <p class="text-muted mb-4 small d-flex align-items-center">
+                            <i class="bi bi-geo-alt-fill text-teal me-2 fs-5"></i>
+                            @prop.Address, @prop.City
+                        </p>
+                        
+                        <div class="mt-4 pt-3 border-top">
+                            <div class="mb-2 d-flex justify-content-between small align-items-center">
+                                <span class="text-muted fw-bold">Occupancy Rate</span>
+                                <span class="fw-bold fs-6" style="color: @GetOccupancyColor(prop.OccupancyPercent)">@(Math.Round(prop.OccupancyPercent))%</span>
+                            </div>
+                            <div class="progress rounded-pill shadow-sm" style="height: 10px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" 
+                                     style="width: @prop.OccupancyPercent%; background-color: @GetOccupancyColor(prop.OccupancyPercent);"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         }
         
-        @if (!properties.Any())
+        @if (!FilteredProperties.Any())
         {
-            <div class="col-12 text-center py-5">
+            <div class="col-12 text-center py-5 glass-card shadow-sm border border-light">
                 <div class="text-muted mb-3"><i class="bi bi-building fs-1"></i></div>
-                <h5>No properties yet</h5>
-                <p class="text-muted">Add your first property to get started.</p>
-                <button class="btn btn-primary mt-2">Add Property</button>
+                <h4 class="text-navy fw-bold">No properties match your search</h4>
+                <p class="text-muted">Try adjusting your filters or search keywords.</p>
+                <button class="btn btn-teal mt-2 rounded-pill px-4" @onclick="ClearSearch">Clear Search</button>
             </div>
         }
     </div>
 }
 
+<style>
+    .glass-search-bar {
+        border-radius: 30px !important;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.95);
+    }
+    .glass-search-bar input:focus {
+        box-shadow: none;
+        background: var(--color-white);
+    }
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .hover-lift:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08) !important;
+    }
+    .property-header-stripe {
+        height: 6px;
+        width: 100%;
+    }
+    .btn-teal {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+    .btn-teal:hover {
+        background-color: #0284c7;
+        color: var(--color-white);
+    }
+    .bg-teal-light { background-color: var(--color-teal-light); }
+    .text-teal { color: var(--color-teal); }
+</style>
+
 @code {
     private List<PropertyView>? properties;
+    private string searchQuery = "";
 
     protected override async Task OnInitializedAsync()
     {
         properties = await PropertyService.GetProperties();
     }
 
+    private IEnumerable<PropertyView> FilteredProperties
+    {
+        get
+        {
+            if (properties == null) return Enumerable.Empty<PropertyView>();
+            if (string.IsNullOrWhiteSpace(searchQuery)) return properties;
+            
+            var query = searchQuery.ToLower().Trim();
+            return properties.Where(p => 
+                p.Name.ToLower().Contains(query) || 
+                p.Address.ToLower().Contains(query) || 
+                p.City.ToLower().Contains(query)
+            );
+        }
+    }
+
     private void ViewProperty(int id)
     {
         NavigationManager.NavigateTo($"/landlord/properties/{id}");
+    }
+
+    private string GetOccupancyColor(double percent)
+    {
+        if (percent >= 80) return "var(--color-green)";
+        if (percent >= 40) return "var(--color-teal)";
+        return "var(--color-amber)";
+    }
+
+    private void ClearSearch()
+    {
+        searchQuery = "";
     }
 }

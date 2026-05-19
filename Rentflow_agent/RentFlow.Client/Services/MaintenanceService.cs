@@ -37,6 +37,13 @@ namespace RentFlow.Client.Services
             return 0;
         }
 
+        public async Task<bool> UpdateTicket(int id, string status, string? assignedTo)
+        {
+            var dto = new MaintenanceTicketDto { Status = status, AssignedTo = assignedTo };
+            var response = await _httpClient.PutAsJsonAsync($"api/maintenance/{id}", dto);
+            return response.IsSuccessStatusCode;
+        }
+
         private class CreateResult { public int Id { get; set; } }
     }
 
@@ -51,6 +58,8 @@ namespace RentFlow.Client.Services
         public string PropertyName { get; set; } = "";
         public string TenantName { get; set; } = "";
         public string? AssignedTo { get; set; }
+        public string? PhotoPath { get; set; }
+        public string UnitNumber { get; set; } = "";
     }
 
     public class TenantTicketView

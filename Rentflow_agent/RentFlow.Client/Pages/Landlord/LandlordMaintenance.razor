@@ -1,62 +1,74 @@
 @page "/landlord/maintenance"
 @using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
 @attribute [Authorize(Roles = "Landlord")]
 @inject MaintenanceService MaintenanceService
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
 
 <PageTitle>Maintenance Tickets</PageTitle>
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Maintenance Requests</h2>
-    <div class="btn-group">
-        <button class="btn btn-outline-navy active">All</button>
-        <button class="btn btn-outline-navy">Open</button>
-        <button class="btn btn-outline-navy">Resolved</button>
+<div class="d-flex justify-content-between align-items-center mb-4 animate__animated animate__fadeIn">
+    <div>
+        <h2 class="text-navy fw-bold mb-0">Maintenance Requests</h2>
+        <small class="text-muted">Review, delegate, and sign-off on tenancy repair issues</small>
+    </div>
+    
+    <div class="btn-group shadow-sm rounded-pill overflow-hidden bg-white p-1">
+        <button class="btn btn-sm rounded-pill px-3 @(filterStatus == "All" ? "btn-navy" : "btn-light text-navy")" @onclick='() => SetFilter("All")'>All</button>
+        <button class="btn btn-sm rounded-pill px-3 @(filterStatus == "Open" ? "btn-navy" : "btn-light text-navy")" @onclick='() => SetFilter("Open")'>Open</button>
+        <button class="btn btn-sm rounded-pill px-3 @(filterStatus == "InProgress" ? "btn-navy" : "btn-light text-navy")" @onclick='() => SetFilter("InProgress")'>In Progress</button>
+        <button class="btn btn-sm rounded-pill px-3 @(filterStatus == "Resolved" ? "btn-navy" : "btn-light text-navy")" @onclick='() => SetFilter("Resolved")'>Resolved</button>
     </div>
 </div>
 
 @if (tickets == null)
 {
-    <LoadingSpinner />
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+        <LoadingSpinner />
+    </div>
 }
 else
 {
-    <div class="form-card">
+    <div class="card glass-card p-4 border-0 shadow-sm animate__animated animate__fadeInUp">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
-                        <th>ID</th>
-                        <th>Date</th>
-                        <th>Property/Tenant</th>
+                        <th>Ticket ID</th>
+                        <th>Logged Date</th>
+                        <th>Property & Unit</th>
+                        <th>Tenant</th>
                         <th>Category</th>
                         <th>Urgency</th>
                         <th>Status</th>
-                        <th>Actions</th>
+                        <th class="text-end">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var ticket in tickets)
+                    @foreach (var ticket in FilteredTickets)
                     {
-                        <tr>
-                            <td>#@ticket.Id</td>
+                        <tr class="hover-row">
+                            <td class="fw-bold text-navy">#@ticket.Id</td>
                             <td>@ticket.CreatedAt.ToString("MMM dd, yyyy")</td>
                             <td>
-                                <div><strong>@ticket.PropertyName</strong></div>
-                                <div class="small text-muted">@ticket.TenantName</div>
+                                <strong class="text-navy">@ticket.PropertyName</strong>
+                                <span class="badge bg-teal bg-opacity-10 text-teal rounded-pill ms-2 small">Unit @ticket.UnitNumber</span>
                             </td>
-                            <td>@ticket.Category</td>
+                            <td class="text-muted fw-bold">@ticket.TenantName</td>
+                            <td class="text-navy fw-bold"><i class="bi @GetCategoryIcon(ticket.Category) me-2"></i>@ticket.Category</td>
                             <td>
                                 @if (ticket.Urgency == 3)
                                 {
-                                    <span class="badge bg-danger">Emergency</span>
+                                    <span class="badge bg-danger rounded-pill px-3 py-2 text-white">Emergency</span>
                                 }
                                 else if (ticket.Urgency == 2)
                                 {
-                                    <span class="badge bg-warning text-dark">Moderate</span>
+                                    <span class="badge bg-warning rounded-pill px-3 py-2 text-dark">Moderate</span>
                                 }
                                 else
                                 {
-                                    <span class="badge bg-info">Minor</span>
+                                    <span class="badge bg-info rounded-pill px-3 py-2 text-white">Minor</span>
                                 }
                             </td>
                             <td>
@@ -66,22 +78,27 @@ else
                                 }
                                 else if (ticket.Status == "InProgress")
                                 {
-                                    <span class="badge bg-primary">In Progress</span>
+                                    <span class="badge bg-primary rounded-pill px-3 py-2 text-white">In Progress</span>
                                 }
                                 else
                                 {
                                     <span class="badge-paid">Resolved</span>
                                 }
                             </td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-navy">Details</button>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-navy rounded-pill px-3" @onclick="() => OpenDetailsModal(ticket)">
+                                    <i class="bi bi-eye me-1"></i>Details
+                                </button>
                             </td>
                         </tr>
                     }
-                    @if (!tickets.Any())
+                    @if (!FilteredTickets.Any())
                     {
                         <tr>
-                            <td colspan="7" class="text-center py-4">No maintenance tickets found.</td>
+                            <td colspan="8" class="text-center py-5 text-muted">
+                                <i class="bi bi-clipboard-check text-muted fs-1 d-block mb-3"></i>
+                                No maintenance tickets found under this status.
+                            </td>
                         </tr>
                     }
                 </tbody>
@@ -90,11 +107,236 @@ else
     </div>
 }
 
+<!-- Dynamic Ticket Details Modal -->
+@if (showDetailsModal && selectedTicket != null)
+{
+    <div class="modal fade show d-block animate__animated animate__fadeIn" tabindex="-1" style="background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content glass-card border-0 shadow-lg p-3">
+                <div class="modal-header border-0 pb-0">
+                    <div class="d-flex align-items-center">
+                        <span class="p-2 bg-light rounded-circle shadow-sm me-3 text-navy"><i class="bi bi-tools fs-4"></i></span>
+                        <div>
+                            <h5 class="modal-title text-navy fw-bold m-0">Ticket #@selectedTicket.Id: @selectedTicket.Category</h5>
+                            <small class="text-muted">@selectedTicket.PropertyName &bull; Unit @selectedTicket.UnitNumber</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" @onclick="CloseDetailsModal"></button>
+                </div>
+                
+                <div class="modal-body py-3">
+                    <div class="row">
+                        <!-- Ticket Info & Photo -->
+                        <div class="col-md-6 mb-3">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <span class="d-block small text-muted fw-bold mb-1">TENANT REPORTED DESCRIPTION</span>
+                                <p class="text-navy fw-bold" style="white-space: pre-wrap; font-size: 14px;">"@selectedTicket.Description"</p>
+                                
+                                <div class="row mt-4">
+                                    <div class="col-6">
+                                        <span class="d-block small text-muted fw-bold">URGENCY</span>
+                                        <span class="fw-bold @(selectedTicket.Urgency == 3 ? "text-danger" : "text-navy")">
+                                            @(selectedTicket.Urgency == 3 ? "Emergency" : selectedTicket.Urgency == 2 ? "Moderate" : "Minor")
+                                        </span>
+                                    </div>
+                                    <div class="col-6">
+                                        <span class="d-block small text-muted fw-bold">LOGGED DATE</span>
+                                        <span class="text-navy fw-bold">@selectedTicket.CreatedAt.ToString("MMM dd, yyyy")</span>
+                                    </div>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(selectedTicket.PhotoPath))
+                                {
+                                    <div class="mt-4">
+                                        <span class="d-block small text-muted fw-bold mb-2">ATTACHED SNAPSHOT</span>
+                                        <div class="rounded-3 overflow-hidden shadow-sm hover-scale border border-light" style="max-height: 180px;">
+                                            <img src="/uploads/@selectedTicket.PhotoPath" alt="Maintenance Ticket Photo" class="img-fluid w-100" style="object-fit: cover;" @onclick="OpenLightbox" />
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+
+                        <!-- Update Status Form -->
+                        <div class="col-md-6 mb-3">
+                            <div class="p-3 bg-light rounded-3 h-100">
+                                <h6 class="text-navy fw-bold mb-3 border-bottom pb-2">Status & Delegation</h6>
+                                
+                                <div class="mb-4">
+                                    <label class="form-label text-muted small fw-bold">Modify Status</label>
+                                    <select class="form-select border-0 p-3 bg-white shadow-sm rounded-3" @bind="updateStatus">
+                                        <option value="Open">Open</option>
+                                        <option value="InProgress">In Progress</option>
+                                        <option value="Resolved">Resolved</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label text-muted small fw-bold">Assign Tradesperson (Name & Contact)</label>
+                                    <div class="input-group bg-white shadow-sm rounded-3 border-0">
+                                        <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-person-badge"></i></span>
+                                        <input type="text" class="form-control border-0 p-3" @bind="updateAssignedTo" placeholder="e.g. Asif (Plumber) - 0300-1234567" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @onclick="CloseDetailsModal">Close</button>
+                    <button type="button" class="btn btn-teal rounded-pill px-4" @onclick="SubmitUpdate" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Update Ticket</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+    }
+    .btn-navy {
+        background-color: var(--color-navy);
+        color: var(--color-white);
+    }
+    .btn-navy:hover {
+        background-color: var(--color-navy-light);
+        color: var(--color-white);
+    }
+    .btn-teal {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+    .btn-teal:hover {
+        background-color: #0284c7;
+        color: var(--color-white);
+    }
+    .hover-row:hover {
+        background-color: var(--color-gray-100) !important;
+    }
+    .hover-scale {
+        cursor: pointer;
+        transition: transform 0.2s ease;
+    }
+    .hover-scale:hover {
+        transform: scale(1.02);
+    }
+</style>
+
 @code {
     private List<LandlordTicketView>? tickets;
+    private string filterStatus = "All";
+
+    // Modal state
+    private bool showDetailsModal = false;
+    private LandlordTicketView? selectedTicket;
+    private string updateStatus = "Open";
+    private string updateAssignedTo = "";
+    private bool isSubmitting = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadTickets();
+    }
+
+    private async Task LoadTickets()
+    {
         tickets = await MaintenanceService.GetLandlordTickets();
+    }
+
+    private void SetFilter(string status)
+    {
+        filterStatus = status;
+    }
+
+    private IEnumerable<LandlordTicketView> FilteredTickets
+    {
+        get
+        {
+            if (tickets == null) return Enumerable.Empty<LandlordTicketView>();
+            if (filterStatus == "All") return tickets;
+            return tickets.Where(t => t.Status == filterStatus);
+        }
+    }
+
+    private void OpenDetailsModal(LandlordTicketView ticket)
+    {
+        selectedTicket = ticket;
+        updateStatus = ticket.Status;
+        updateAssignedTo = ticket.AssignedTo ?? "";
+        showDetailsModal = true;
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedTicket = null;
+    }
+
+    private async Task SubmitUpdate()
+    {
+        if (selectedTicket == null) return;
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await MaintenanceService.UpdateTicket(selectedTicket.Id, updateStatus, updateAssignedTo);
+            if (success)
+            {
+                ToastService.ShowSuccess($"Ticket #{selectedTicket.Id} updated successfully!");
+                showDetailsModal = false;
+                await LoadTickets();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to update ticket. Check validation.");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("A system error occurred while updating the ticket.");
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetCategoryIcon(string category)
+    {
+        return category.ToLower() switch
+        {
+            "plumbing" => "bi-droplet-fill",
+            "electrical" => "bi-lightning-charge-fill",
+            "hvac" => "bi-wind",
+            "structural" => "bi-hammer",
+            _ => "bi-shield-exclamation"
+        };
+    }
+
+    private void OpenLightbox()
+    {
+        // For premium visual zoom, open photo path directly
+        if (selectedTicket != null && !string.IsNullOrEmpty(selectedTicket.PhotoPath))
+        {
+            NavigationManager.NavigateTo($"/uploads/{selectedTicket.PhotoPath}", forceLoad: true);
+        }
     }
 }

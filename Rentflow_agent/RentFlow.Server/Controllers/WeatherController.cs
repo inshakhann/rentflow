@@ -4,6 +4,10 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
+using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
+using RentFlow.Server.Data;
 
 namespace RentFlow.Server.Controllers
 {
@@ -14,11 +18,13 @@ namespace RentFlow.Server.Controllers
     {
         private readonly HttpClient _httpClient;
         private readonly IConfiguration _config;
+        private readonly AppDbContext _context;
 
-        public WeatherController(HttpClient httpClient, IConfiguration config)
+        public WeatherController(HttpClient httpClient, IConfiguration config, AppDbContext context)
         {
             _httpClient = httpClient;
             _config = config;
+            _context = context;
         }
 
         [HttpGet]
@@ -36,6 +42,47 @@ namespace RentFlow.Server.Controllers
 
             var data = await response.Content.ReadAsStringAsync();
             return Content(data, "application/json");
+        }
+
+        [HttpGet("landlord/alerts")]
+        public async Task<IActionResult> GetLandlordAlerts()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var alerts = await _context.WeatherAlertLogs
+                .Include(w => w.Property)
+                .Where(w => w.Property.LandlordId == userId && !w.IsRead)
+                .Select(w => new
+                {
+                    w.Id,
+                    w.PropertyId,
+                    PropertyName = w.Property.Name,
+                    w.AlertType,
+                    w.Message,
+                    w.TriggeredAt,
+                    w.IsRead
+                })
+                .OrderByDescending(w => w.TriggeredAt)
+                .ToListAsync();
+
+            return Ok(alerts);
+        }
+
+        [HttpPut("alerts/{id}/read")]
+        public async Task<IActionResult> MarkAlertAsRead(int id)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var alert = await _context.WeatherAlertLogs
+                .Include(w => w.Property)
+                .FirstOrDefaultAsync(w => w.Id == id && w.Property.LandlordId == userId);
+
+            if (alert == null) return NotFound();
+
+            alert.IsRead = true;
+            await _context.SaveChangesAsync();
+
+            return Ok();
         }
     }
 }

@@ -30,6 +30,7 @@ namespace RentFlow.Server.Controllers
             var tickets = await _context.MaintenanceTickets
                 .Include(t => t.Property)
                 .Include(t => t.Tenant)
+                .Include(t => t.Unit)
                 .Where(t => t.Property.LandlordId == userId)
                 .Select(t => new
                 {
@@ -41,7 +42,9 @@ namespace RentFlow.Server.Controllers
                     t.CreatedAt,
                     PropertyName = t.Property.Name,
                     TenantName = t.Tenant.FullName,
-                    t.AssignedTo
+                    t.AssignedTo,
+                    t.PhotoPath,
+                    UnitNumber = t.Unit.UnitNumber
                 })
                 .OrderByDescending(t => t.CreatedAt)
                 .ToListAsync();
@@ -99,6 +102,24 @@ namespace RentFlow.Server.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { ticket.Id });
+        }
+
+        [HttpPut("{id}")]
+        public async Task<IActionResult> UpdateTicket(int id, [FromBody] MaintenanceTicketDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var ticket = await _context.MaintenanceTickets
+                .Include(t => t.Property)
+                .FirstOrDefaultAsync(t => t.Id == id && t.Property.LandlordId == userId);
+
+            if (ticket == null) return NotFound();
+
+            ticket.Status = dto.Status;
+            ticket.AssignedTo = dto.AssignedTo;
+            ticket.UpdatedAt = System.DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return Ok();
         }
     }
 }

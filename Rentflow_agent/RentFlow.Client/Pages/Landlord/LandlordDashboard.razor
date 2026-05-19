@@ -4,21 +4,64 @@
 @inject PropertyService PropertyService
 @inject PaymentService PaymentService
 @inject MaintenanceService MaintenanceService
+@inject WeatherService WeatherService
 
 <PageTitle>Landlord Dashboard</PageTitle>
 
 @if (isLoading)
 {
-    <LoadingSpinner />
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <LoadingSpinner />
+    </div>
 }
 else
 {
+    <!-- Active Weather Warnings -->
+    @if (alerts != null && alerts.Count > 0)
+    {
+        <div class="row mb-4 animate__animated animate__fadeIn">
+            <div class="col-12">
+                <div class="alert border-0 shadow-sm d-flex flex-column gap-3 p-4 rounded-4" style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-left: 6px solid var(--color-amber) !important;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <div class="p-2 bg-white rounded-circle shadow-sm me-3">
+                                <i class="bi bi-cloud-lightning-rain-fill text-amber fs-4"></i>
+                            </div>
+                            <div>
+                                <h5 class="m-0 text-navy fw-bold">Active Weather Alerts</h5>
+                                <small class="text-muted">Extreme climate warnings for your properties</small>
+                            </div>
+                        </div>
+                        <span class="badge bg-amber text-dark px-3 py-2 rounded-pill fw-bold">@alerts.Count Active</span>
+                    </div>
+                    
+                    <div class="d-flex flex-column gap-2 mt-1">
+                        @foreach (var alert in alerts)
+                        {
+                            <div class="d-flex justify-content-between align-items-center bg-white bg-opacity-70 p-3 rounded-3 shadow-sm border border-amber border-opacity-20 hover-scale">
+                                <div>
+                                    <span class="badge bg-danger text-white me-2">@alert.AlertType</span>
+                                    <strong class="text-navy me-1">@alert.PropertyName:</strong>
+                                    <span class="text-gray-700">@alert.Message</span>
+                                </div>
+                                <button class="btn btn-sm btn-navy px-3 rounded-pill" @onclick="() => DismissAlert(alert.Id)">
+                                    <i class="bi bi-check-circle me-1"></i> Acknowledge
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Stat Grid -->
     <div class="row mb-4">
         <div class="col-xl-3 col-md-6 col-12 mb-3">
-            <div class="stat-card">
+            <div class="stat-card glass-card hover-lift">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="card-title">Properties</div>
+                        <div class="card-title text-muted fw-bold">Properties</div>
                         <div class="stat-value">@properties?.Count</div>
                     </div>
                     <div class="p-3 bg-teal-light rounded-circle text-teal">
@@ -28,39 +71,39 @@ else
             </div>
         </div>
         <div class="col-xl-3 col-md-6 col-12 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-green)">
+            <div class="stat-card glass-card hover-lift" style="border-left-color: var(--color-green)">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="card-title">Revenue (YTD)</div>
-                        <div class="stat-value">Rs @(revenue?.Sum(r => r.Total).ToString("N0") ?? "0")</div>
+                        <div class="card-title text-muted fw-bold">Revenue (YTD)</div>
+                        <div class="stat-value text-green">Rs @(revenue?.Sum(r => r.Total).ToString("N0") ?? "0")</div>
                     </div>
                     <div class="p-3 bg-green-light rounded-circle text-green">
-                        <i class="bi bi-currency-dollar fs-4"></i>
+                        <i class="bi bi-cash-stack fs-4"></i>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6 col-12 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-amber)">
+            <div class="stat-card glass-card hover-lift" style="border-left-color: var(--color-amber)">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="card-title">Open Tickets</div>
-                        <div class="stat-value">@tickets?.Count(t => t.Status == "Open")</div>
+                        <div class="card-title text-muted fw-bold">Open Tickets</div>
+                        <div class="stat-value text-amber">@tickets?.Count(t => t.Status == "Open")</div>
                     </div>
                     <div class="p-3 bg-amber-light rounded-circle text-amber">
-                        <i class="bi bi-tools fs-4"></i>
+                        <i class="bi bi-ticket-perforated fs-4"></i>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-xl-3 col-md-6 col-12 mb-3">
-            <div class="stat-card" style="border-left-color: var(--color-danger)">
+            <div class="stat-card glass-card hover-lift" style="border-left-color: var(--color-red)">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="card-title">Late Payments</div>
-                        <div class="stat-value">@latePayments?.Count</div>
+                        <div class="card-title text-muted fw-bold">Late Payments</div>
+                        <div class="stat-value text-danger">@latePayments?.Count</div>
                     </div>
-                    <div class="p-3 bg-danger bg-opacity-10 rounded-circle text-danger">
+                    <div class="p-3 bg-red-light rounded-circle text-danger">
                         <i class="bi bi-exclamation-triangle fs-4"></i>
                     </div>
                 </div>
@@ -68,57 +111,169 @@ else
         </div>
     </div>
 
+    <!-- Charts & Lists -->
     <div class="row">
+        <!-- Revenue Chart -->
         <div class="col-lg-8 mb-4">
-            <div class="form-card h-100">
+            <div class="form-card glass-card h-100 p-4 shadow-sm border border-light">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="mb-0">Revenue Overview</h3>
-                    <a href="landlord/revenue" class="btn btn-sm btn-outline-navy">View Details</a>
+                    <div>
+                        <h4 class="mb-0 text-navy fw-bold">Revenue Overview</h4>
+                        <small class="text-muted">Monthly income trends for the last 6 months</small>
+                    </div>
+                    <a href="landlord/revenue" class="btn btn-sm btn-outline-navy rounded-pill px-3">
+                        <i class="bi bi-graph-up me-1"></i> Full Analytics
+                    </a>
                 </div>
-                <div style="height: 300px;">
+                <div style="height: 320px;">
                     <canvas id="revenueChart"></canvas>
                 </div>
             </div>
         </div>
+
+        <!-- Maintenance Tickets Donut -->
         <div class="col-lg-4 mb-4">
-            <div class="form-card h-100">
+            <div class="form-card glass-card h-100 p-4 shadow-sm border border-light">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="mb-0">Late Payments</h3>
+                    <div>
+                        <h4 class="mb-0 text-navy fw-bold">Maintenance Requests</h4>
+                        <small class="text-muted">Ticket status distribution</small>
+                    </div>
+                    <a href="landlord/maintenance" class="btn btn-sm btn-outline-navy rounded-circle p-1">
+                        <i class="bi bi-arrow-right fs-5"></i>
+                    </a>
                 </div>
-                <div class="list-group list-group-flush">
-                    @if (latePayments == null || latePayments.Count == 0)
-                    {
-                        <div class="text-center py-4 text-muted">No late payments!</div>
-                    }
-                    else
-                    {
-                        @foreach (var late in latePayments.Take(5))
-                        {
-                            <div class="list-group-item px-0">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>@late.TenantName</strong>
-                                        <div class="text-muted small">Unit @late.UnitNumber</div>
-                                    </div>
-                                    <div class="text-end">
-                                        <div class="text-danger fw-bold">Rs @(late.Amount + late.LateFee)</div>
-                                        <div class="text-muted small">@late.DaysOverdue days late</div>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-                    }
+                <div style="height: 220px; position: relative;">
+                    <canvas id="ticketsDonutChart"></canvas>
+                </div>
+                <div class="d-flex justify-content-around mt-3 pt-2 border-top">
+                    <div class="text-center">
+                        <span class="d-block small text-muted">Open</span>
+                        <strong class="text-danger">@tickets?.Count(t => t.Status == "Open")</strong>
+                    </div>
+                    <div class="text-center">
+                        <span class="d-block small text-muted">In Progress</span>
+                        <strong class="text-teal">@tickets?.Count(t => t.Status == "InProgress")</strong>
+                    </div>
+                    <div class="text-center">
+                        <span class="d-block small text-muted">Resolved</span>
+                        <strong class="text-green">@tickets?.Count(t => t.Status == "Resolved")</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Late Payments Table -->
+        <div class="col-lg-12">
+            <div class="form-card glass-card p-4 shadow-sm border border-light">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <div>
+                        <h4 class="mb-0 text-navy fw-bold">Late Payment Monitor</h4>
+                        <small class="text-muted">Active tenancies overdue on monthly rental dues</small>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle m-0">
+                        <thead class="rounded-3">
+                            <tr>
+                                <th class="border-0 rounded-start">Tenant</th>
+                                <th class="border-0">Unit</th>
+                                <th class="border-0">Amount Due</th>
+                                <th class="border-0">Late Surcharge</th>
+                                <th class="border-0">Days Overdue</th>
+                                <th class="border-0 rounded-end text-end">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (latePayments == null || latePayments.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="bi bi-check-circle-fill text-green fs-1 d-block mb-3"></i>
+                                        All payments are up to date!
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var late in latePayments)
+                                {
+                                    <tr class="hover-row">
+                                        <td class="fw-bold text-navy">@late.TenantName</td>
+                                        <td>
+                                            <span class="badge bg-teal bg-opacity-10 text-teal px-3 py-2 rounded-pill">
+                                                <i class="bi bi-door-open me-1"></i>@late.UnitNumber
+                                            </span>
+                                        </td>
+                                        <td class="fw-bold">Rs @late.Amount.ToString("N0")</td>
+                                        <td class="text-danger fw-bold">+Rs @late.LateFee.ToString("N0")</td>
+                                        <td>
+                                            <span class="badge bg-red bg-opacity-10 text-danger px-3 py-2 rounded-pill fw-bold">
+                                                <i class="bi bi-clock me-1"></i>@late.DaysOverdue Days
+                                            </span>
+                                        </td>
+                                        <td class="text-end">
+                                            <a href="landlord/tenants" class="btn btn-sm btn-outline-navy rounded-pill px-3">
+                                                Contact Tenant
+                                            </a>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 }
 
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    .hover-lift:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05) !important;
+    }
+    .hover-scale:hover {
+        transform: scale(1.01);
+        transition: transform 0.2s ease;
+    }
+    .btn-navy {
+        background-color: var(--color-navy);
+        color: var(--color-white);
+    }
+    .btn-navy:hover {
+        background-color: var(--color-navy-light);
+        color: var(--color-white);
+    }
+    .hover-row:hover {
+        background-color: var(--color-gray-100) !important;
+    }
+    .bg-teal-light { background-color: var(--color-teal-light); }
+    .bg-green-light { background-color: var(--color-green-light); }
+    .bg-amber-light { background-color: var(--color-amber-light); }
+    .bg-red-light { background-color: var(--color-red-light); }
+    .text-teal { color: var(--color-teal); }
+    .text-green { color: var(--color-green); }
+    .text-amber { color: var(--color-amber); }
+    .bg-amber { background-color: var(--color-amber); }
+</style>
+
 @code {
     private List<PropertyView>? properties;
     private List<RevenueItem>? revenue;
     private List<LandlordTicketView>? tickets;
     private List<LatePaymentItem>? latePayments;
+    private List<WeatherAlertView>? alerts;
     private bool isLoading = true;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
@@ -130,7 +285,8 @@ else
             Task.Run(async () => properties = await PropertyService.GetProperties()),
             Task.Run(async () => revenue = await PaymentService.GetLandlordRevenue()),
             Task.Run(async () => tickets = await MaintenanceService.GetLandlordTickets()),
-            Task.Run(async () => latePayments = await PaymentService.GetLatePayments())
+            Task.Run(async () => latePayments = await PaymentService.GetLatePayments()),
+            Task.Run(async () => alerts = await WeatherService.GetLandlordAlerts())
         };
 
         await Task.WhenAll(tasks);
@@ -139,11 +295,34 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!isLoading && revenue != null && revenue.Count > 0)
+        if (!isLoading)
         {
-            var labels = revenue.Select(r => r.Label).ToArray();
-            var data = revenue.Select(r => r.Total).ToArray();
-            await JSRuntime.InvokeVoidAsync("renderBarChart", "revenueChart", labels, data);
+            if (revenue != null && revenue.Count > 0)
+            {
+                var labels = revenue.Select(r => r.Label).ToArray();
+                var data = revenue.Select(r => r.Total).ToArray();
+                await JSRuntime.InvokeVoidAsync("renderBarChart", "revenueChart", labels, data);
+            }
+
+            if (tickets != null)
+            {
+                var openCount = tickets.Count(t => t.Status == "Open");
+                var inProgressCount = tickets.Count(t => t.Status == "InProgress");
+                var resolvedCount = tickets.Count(t => t.Status == "Resolved");
+                await JSRuntime.InvokeVoidAsync("renderDonutChart", "ticketsDonutChart", 
+                    new string[] { "Open", "In Progress", "Resolved" }, 
+                    new int[] { openCount, inProgressCount, resolvedCount });
+            }
+        }
+    }
+
+    private async Task DismissAlert(int id)
+    {
+        var success = await WeatherService.MarkAlertAsRead(id);
+        if (success)
+        {
+            alerts = await WeatherService.GetLandlordAlerts();
+            StateHasChanged();
         }
     }
 }

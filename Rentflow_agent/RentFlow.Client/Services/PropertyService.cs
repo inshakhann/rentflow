@@ -36,6 +36,18 @@ namespace RentFlow.Client.Services
             return 0;
         }
 
+        public async Task<bool> CreateUnit(int propertyId, UnitDto dto)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"api/properties/{propertyId}/units", dto);
+            return response.IsSuccessStatusCode;
+        }
+
+        public async Task<bool> UpdateUnit(int unitId, UnitDto dto)
+        {
+            var response = await _httpClient.PutAsJsonAsync($"api/properties/units/{unitId}", dto);
+            return response.IsSuccessStatusCode;
+        }
+
         private class CreateResult { public int Id { get; set; } }
     }
 
@@ -44,6 +56,7 @@ namespace RentFlow.Client.Services
         public int Id { get; set; }
         public string Name { get; set; } = "";
         public string Address { get; set; } = "";
+        public string City { get; set; } = "";
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
         public List<UnitView> Units { get; set; } = new();
@@ -54,6 +67,7 @@ namespace RentFlow.Client.Services
         public int Id { get; set; }
         public string UnitNumber { get; set; } = "";
         public decimal MonthlyRent { get; set; }
+        public int Bedrooms { get; set; }
         public bool IsOccupied { get; set; }
         public string? TenantName { get; set; }
     }

@@ -1,0 +1,328 @@
+@page "/landlord/tenants"
+@using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject LeaseService LeaseService
+@inject ToastService ToastService
+
+<PageTitle>My Tenants</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4 animate__animated animate__fadeIn">
+    <div>
+        <h2 class="text-navy fw-bold mb-0">My Tenants</h2>
+        <small class="text-muted">Monitor lease profiles, monthly rent structures, and send rental invitations</small>
+    </div>
+    <button class="btn btn-teal rounded-pill px-4" @onclick="OpenInviteModal">
+        <i class="bi bi-person-plus-fill me-2"></i>Invite Tenant
+    </button>
+</div>
+
+@if (leases == null)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 300px;">
+        <LoadingSpinner />
+    </div>
+}
+else
+{
+    <div class="card glass-card p-4 border-0 shadow-sm animate__animated animate__fadeInUp">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Tenant</th>
+                        <th>Email</th>
+                        <th>Property</th>
+                        <th>Unit</th>
+                        <th>Lease Period</th>
+                        <th>Monthly Rent</th>
+                        <th>Payment Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @if (leases == null || !leases.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-5 text-muted">
+                                <i class="bi bi-people-fill text-muted fs-1 d-block mb-3"></i>
+                                No active tenant tenancies registered. Click Invite Tenant to get started!
+                            </td>
+                        </tr>
+                    }
+                    else
+                    {
+                        @foreach (var lease in leases)
+                        {
+                            <tr class="hover-row">
+                                <td class="fw-bold text-navy">@lease.TenantName</td>
+                                <td class="text-muted">@lease.TenantEmail</td>
+                                <td class="fw-bold">@lease.PropertyName</td>
+                                <td>
+                                    <span class="badge bg-teal bg-opacity-10 text-teal px-3 py-2 rounded-pill fw-bold">
+                                        Unit @lease.UnitNumber
+                                    </span>
+                                </td>
+                                <td class="small text-navy fw-bold">
+                                    @lease.StartDate.ToString("MMM dd, yyyy") - @(lease.EndDate.HasValue ? lease.EndDate.Value.ToString("MMM dd, yyyy") : "Ongoing")
+                                </td>
+                                <td class="fw-bold">Rs @lease.MonthlyRent.ToString("N0")</td>
+                                <td>
+                                    @if (lease.PaymentStatus == "Paid")
+                                    {
+                                        <span class="badge-paid">Paid</span>
+                                    }
+                                    else if (lease.PaymentStatus == "Pending")
+                                    {
+                                        <span class="badge-pending">Pending</span>
+                                    }
+                                    else if (lease.PaymentStatus == "Late")
+                                    {
+                                        <span class="badge-late">Overdue</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary text-white rounded-pill px-3 py-1 fw-bold">@lease.PaymentStatus</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+<!-- Dynamic Bootstrap Modal for Tenant Invitation -->
+@if (showInviteModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-card border-0 shadow-lg p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title text-navy fw-bold"><i class="bi bi-send-plus-fill text-teal me-2"></i>Invite Tenant</h5>
+                    <button type="button" class="btn-close" @onclick="CloseInviteModal"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <!-- Available Tenants List Dropdown -->
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Registered Renter</label>
+                        <select class="form-select p-3 bg-light border-0" @bind="inviteModel.TenantEmail" required>
+                            <option value="">-- Choose Tenant Email --</option>
+                            @if (availableTenants != null)
+                            {
+                                @foreach (var tenant in availableTenants)
+                                {
+                                    <option value="@tenant.Email">@tenant.FullName (@tenant.Email)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Property Dropdown -->
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Assign to Property</label>
+                        <select class="form-select p-3 bg-light border-0" @onchange="OnPropertySelected" required>
+                            <option value="0">-- Select Property --</option>
+                            @if (properties != null)
+                            {
+                                @foreach (var prop in properties)
+                                {
+                                    <option value="@prop.Id">@prop.Name</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Unit Dropdown -->
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Choose Vacant Unit</label>
+                        <select class="form-select p-3 bg-light border-0" @bind="inviteModel.UnitId" required>
+                            <option value="0">-- Select Vacant Unit --</option>
+                            @if (vacantUnits != null)
+                            {
+                                @foreach (var unit in vacantUnits)
+                                {
+                                    <option value="@unit.Id">@unit.UnitNumber - (Rs @unit.MonthlyRent.ToString("N0") / @unit.Bedrooms BR)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label text-muted small fw-bold">Lease Start</label>
+                            <input type="date" class="form-control p-3 bg-light border-0" @bind="inviteModel.StartDate" />
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label text-muted small fw-bold">Lease End</label>
+                            <input type="date" class="form-control p-3 bg-light border-0" @bind="inviteModel.EndDate" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Adjust Monthly Rent (PKR)</label>
+                        <input type="number" class="form-control p-3 bg-light border-0" @bind="inviteModel.MonthlyRent" placeholder="e.g. 50000" />
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @onclick="CloseInviteModal">Close</button>
+                    <button type="button" class="btn btn-teal rounded-pill px-4" @onclick="SubmitInvitation" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Inviting...</span>
+                        }
+                        else
+                        {
+                            <span>Send Invitation</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+    }
+    .btn-teal {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+    .btn-teal:hover {
+        background-color: #0284c7;
+        color: var(--color-white);
+    }
+    .hover-row:hover {
+        background-color: var(--color-gray-100) !important;
+    }
+</style>
+
+@code {
+    private List<LeaseDto>? leases;
+    private List<AvailableTenantView>? availableTenants;
+    private List<PropertyView>? properties;
+    private List<UnitView>? vacantUnits;
+
+    // Invitation Form Model
+    private CreateLeaseDto inviteModel = new() { StartDate = DateTime.Today, EndDate = DateTime.Today.AddYears(1) };
+    private bool showInviteModal = false;
+    private bool isSubmitting = false;
+    private int selectedPropertyId = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLeases();
+    }
+
+    private async Task LoadLeases()
+    {
+        leases = await LeaseService.GetLandlordLeases();
+    }
+
+    private async Task OpenInviteModal()
+    {
+        isSubmitting = false;
+        inviteModel = new CreateLeaseDto 
+        { 
+            StartDate = DateTime.Today, 
+            EndDate = DateTime.Today.AddYears(1),
+            MonthlyRent = 50000 
+        };
+        vacantUnits = new List<UnitView>();
+        
+        properties = await PropertyService.GetProperties();
+        availableTenants = await LeaseService.GetAvailableTenants();
+        
+        showInviteModal = true;
+    }
+
+    private void CloseInviteModal()
+    {
+        showInviteModal = false;
+    }
+
+    private async Task OnPropertySelected(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int propertyId) && propertyId > 0)
+        {
+            selectedPropertyId = propertyId;
+            var propDetail = await PropertyService.GetProperty(propertyId);
+            if (propDetail != null && propDetail.Units != null)
+            {
+                vacantUnits = propDetail.Units.Where(u => !u.IsOccupied).ToList();
+                if (vacantUnits.Any())
+                {
+                    inviteModel.UnitId = vacantUnits.First().Id;
+                    inviteModel.MonthlyRent = vacantUnits.First().MonthlyRent;
+                }
+                else
+                {
+                    inviteModel.UnitId = 0;
+                    ToastService.ShowInfo("This property does not have any vacant units.");
+                }
+            }
+        }
+        else
+        {
+            selectedPropertyId = 0;
+            vacantUnits = new List<UnitView>();
+            inviteModel.UnitId = 0;
+        }
+    }
+
+    private async Task SubmitInvitation()
+    {
+        if (string.IsNullOrWhiteSpace(inviteModel.TenantEmail))
+        {
+            ToastService.ShowError("Please select a registered tenant.");
+            return;
+        }
+
+        if (inviteModel.UnitId <= 0)
+        {
+            ToastService.ShowError("Please select a vacant unit.");
+            return;
+        }
+
+        if (inviteModel.MonthlyRent <= 0)
+        {
+            ToastService.ShowError("Rent price must be greater than zero.");
+            return;
+        }
+
+        isSubmitting = true;
+        StateHasChanged();
+
+        try
+        {
+            var success = await LeaseService.CreateLease(inviteModel);
+            if (success)
+            {
+                ToastService.ShowSuccess("Tenant assigned and lease created successfully!");
+                showInviteModal = false;
+                await LoadLeases();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to assign tenant. Make sure they don't have active leases.");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("A system error occurred during invitation dispatch.");
+        }
+        finally
+        {
+            isSubmitting = false;
+            StateHasChanged();
+        }
+    }
+}

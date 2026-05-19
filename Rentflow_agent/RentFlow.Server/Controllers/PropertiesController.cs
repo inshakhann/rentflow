@@ -67,6 +67,7 @@ namespace RentFlow.Server.Controllers
                 property.Id,
                 property.Name,
                 property.Address,
+                property.City,
                 property.Latitude,
                 property.Longitude,
                 Units = property.Units.Select(u => new
@@ -74,6 +75,7 @@ namespace RentFlow.Server.Controllers
                     u.Id,
                     u.UnitNumber,
                     u.MonthlyRent,
+                    u.Bedrooms,
                     u.IsOccupied,
                     TenantName = u.IsOccupied && u.Leases.Any() ? u.Leases.First().Tenant.FullName : null
                 })
@@ -114,6 +116,47 @@ namespace RentFlow.Server.Controllers
             await _context.SaveChangesAsync();
 
             return Ok(new { property.Id });
+        }
+
+        [HttpPost("{propertyId}/units")]
+        public async Task<IActionResult> AddUnit(int propertyId, [FromBody] UnitDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var property = await _context.Properties.FirstOrDefaultAsync(p => p.Id == propertyId && p.LandlordId == userId);
+            if (property == null) return NotFound();
+
+            var unit = new Unit
+            {
+                PropertyId = propertyId,
+                UnitNumber = dto.UnitNumber,
+                MonthlyRent = dto.MonthlyRent,
+                Bedrooms = dto.Bedrooms,
+                IsOccupied = false
+            };
+
+            property.TotalUnits++;
+            _context.Units.Add(unit);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { unit.Id });
+        }
+
+        [HttpPut("units/{unitId}")]
+        public async Task<IActionResult> EditUnit(int unitId, [FromBody] UnitDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var unit = await _context.Units
+                .Include(u => u.Property)
+                .FirstOrDefaultAsync(u => u.Id == unitId && u.Property.LandlordId == userId);
+
+            if (unit == null) return NotFound();
+
+            unit.UnitNumber = dto.UnitNumber;
+            unit.MonthlyRent = dto.MonthlyRent;
+            unit.Bedrooms = dto.Bedrooms;
+
+            await _context.SaveChangesAsync();
+            return Ok();
         }
     }
 }

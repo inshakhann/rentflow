@@ -3,60 +3,91 @@
 @using RentFlow.Shared.DTOs
 @attribute [Authorize(Roles = "Landlord")]
 @inject PropertyService PropertyService
+@inject GeolocationService GeolocationService
 @inject NavigationManager NavigationManager
 @inject ToastService ToastService
 
 <PageTitle>Add New Property</PageTitle>
 
-<div class="d-flex align-items-center mb-4">
+<div class="d-flex align-items-center mb-4 animate__animated animate__fadeIn">
     <button class="btn btn-link text-navy p-0 me-3" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>
         <i class="bi bi-arrow-left fs-4"></i>
     </button>
-    <h2 class="mb-0">Add New Property</h2>
+    <div>
+        <h2 class="text-navy fw-bold mb-0">Add New Property</h2>
+        <small class="text-muted">Register a new estate block with default unit counts</small>
+    </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8 col-lg-6">
-        <div class="form-card">
+<div class="row animate__animated animate__fadeInUp">
+    <div class="col-md-8 col-lg-7 mb-4">
+        <div class="card glass-card p-4 border-0 shadow-sm">
             <EditForm Model="propertyModel" OnValidSubmit="HandleSubmit">
                 <DataAnnotationsValidator />
                 
-                <div class="mb-3">
-                    <label class="form-label text-muted">Property Name</label>
-                    <InputText @bind-Value="propertyModel.Name" class="form-control" placeholder="e.g. Sunny Apartments" required />
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label text-muted">Address</label>
-                    <InputText @bind-Value="propertyModel.Address" class="form-control" placeholder="123 Main St" required />
-                </div>
-                
-                <div class="mb-3">
-                    <label class="form-label text-muted">City</label>
-                    <InputText @bind-Value="propertyModel.City" class="form-control" placeholder="New York" required />
+                <div class="mb-4">
+                    <label class="form-label text-navy fw-bold">Property Name</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="bi bi-building"></i></span>
+                        <InputText @bind-Value="propertyModel.Name" class="form-control p-3 border-0 bg-light" placeholder="e.g. Sunny Apartments" required />
+                    </div>
                 </div>
                 
                 <div class="mb-4">
-                    <label class="form-label text-muted">Total Units</label>
-                    <InputNumber @bind-Value="propertyModel.TotalUnits" class="form-control" min="1" max="100" required />
-                    <div class="form-text">Units will be automatically generated.</div>
+                    <label class="form-label text-navy fw-bold">Address</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="bi bi-geo-alt"></i></span>
+                        <InputText @bind-Value="propertyModel.Address" class="form-control p-3 border-0 bg-light" placeholder="e.g. 123 Main Street" required />
+                    </div>
                 </div>
                 
-                <h5 class="mb-3">Map Coordinates (Optional)</h5>
-                <div class="row mb-4">
-                    <div class="col-6">
-                        <label class="form-label text-muted">Latitude</label>
-                        <InputNumber @bind-Value="propertyModel.Latitude" class="form-control" />
+                <div class="mb-4">
+                    <label class="form-label text-navy fw-bold">City</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="bi bi-map"></i></span>
+                        <InputText @bind-Value="propertyModel.City" class="form-control p-3 border-0 bg-light" placeholder="e.g. Karachi" required />
                     </div>
-                    <div class="col-6">
-                        <label class="form-label text-muted">Longitude</label>
-                        <InputNumber @bind-Value="propertyModel.Longitude" class="form-control" />
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-navy fw-bold">Total Units to Seed</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-0"><i class="bi bi-hash"></i></span>
+                        <InputNumber @bind-Value="propertyModel.TotalUnits" class="form-control p-3 border-0 bg-light" min="1" max="100" required />
+                    </div>
+                    <div class="form-text mt-2 text-muted">RentFlow will automatically pre-generate these units (e.g. U-1, U-2) with a default rental price of 50,000 PKR. You can customize them later.</div>
+                </div>
+                
+                <div class="pt-3 border-top mt-4 mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="text-navy fw-bold m-0"><i class="bi bi-pin-map-fill text-teal me-2"></i>Map Coordinates (Optional)</h5>
+                        <button type="button" class="btn btn-sm btn-outline-teal rounded-pill px-3" @onclick="FetchLocation" disabled="@isLocating">
+                            @if (isLocating)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                                <span>Locating...</span>
+                            }
+                            else
+                            {
+                                <span><i class="bi bi-geo me-1"></i>Use Current Location</span>
+                            }
+                        </button>
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Latitude</label>
+                            <InputNumber @bind-Value="propertyModel.Latitude" class="form-control p-3 border-0 bg-light" step="any" placeholder="e.g. 24.8607" />
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label text-muted small">Longitude</label>
+                            <InputNumber @bind-Value="propertyModel.Longitude" class="form-control p-3 border-0 bg-light" step="any" placeholder="e.g. 67.0011" />
+                        </div>
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-end mt-4">
-                    <button type="button" class="btn btn-outline-secondary me-2" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>Cancel</button>
-                    <button type="submit" class="btn btn-primary px-4" disabled="@isSubmitting">
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>Cancel</button>
+                    <button type="submit" class="btn btn-teal rounded-pill px-4" disabled="@isSubmitting">
                         @if (isSubmitting)
                         {
                             <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
@@ -73,9 +104,81 @@
     </div>
 </div>
 
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+    }
+    .input-group {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+    .input-group-text {
+        color: var(--color-navy);
+    }
+    .form-control:focus {
+        box-shadow: none;
+        background-color: var(--color-white) !important;
+        border: 1px solid var(--color-teal) !important;
+    }
+    .btn-teal {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+    .btn-teal:hover {
+        background-color: #0284c7;
+        color: var(--color-white);
+    }
+    .btn-outline-teal {
+        border-color: var(--color-teal);
+        color: var(--color-teal);
+    }
+    .btn-outline-teal:hover {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+</style>
+
 @code {
     private PropertyDto propertyModel = new PropertyDto { TotalUnits = 1 };
     private bool isSubmitting = false;
+    private bool isLocating = false;
+
+    private async Task FetchLocation()
+    {
+        isLocating = true;
+        StateHasChanged();
+        
+        try
+        {
+            var location = await GeolocationService.GetCurrentLocation();
+            if (location != null)
+            {
+                propertyModel.Latitude = location.Latitude;
+                propertyModel.Longitude = location.Longitude;
+                ToastService.ShowSuccess("Coordinates retrieved successfully from browser!");
+            }
+            else
+            {
+                // Fallback demo coordinates if permission denied or browser unsupported
+                propertyModel.Latitude = 24.8607;
+                propertyModel.Longitude = 67.0011;
+                ToastService.ShowInfo("Using default fallback coordinates (Karachi).");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("Could not retrieve geolocation data.");
+        }
+        finally
+        {
+            isLocating = false;
+            StateHasChanged();
+        }
+    }
 
     private async Task HandleSubmit()
     {
@@ -86,18 +189,18 @@
             var newId = await PropertyService.CreateProperty(propertyModel);
             if (newId > 0)
             {
-                ToastService.ShowSuccess("Property created successfully!");
+                ToastService.ShowSuccess("Property registered successfully!");
                 NavigationManager.NavigateTo($"/landlord/properties/{newId}");
             }
             else
             {
-                ToastService.ShowError("Failed to create property. Please try again.");
+                ToastService.ShowError("Failed to seed property. Please try again.");
                 isSubmitting = false;
             }
         }
         catch (Exception)
         {
-            ToastService.ShowError("An unexpected error occurred.");
+            ToastService.ShowError("An unexpected system error occurred.");
             isSubmitting = false;
         }
     }

@@ -1,0 +1,209 @@
+@page "/landlord/revenue"
+@using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject PaymentService PaymentService
+@inject ToastService ToastService
+
+<PageTitle>Financial Analytics</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4 animate__animated animate__fadeIn">
+    <div>
+        <h2 class="text-navy fw-bold mb-0">Financial Analytics</h2>
+        <small class="text-muted">Real-time revenue metrics, YTD ledger, and monthly rent charts</small>
+    </div>
+</div>
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <LoadingSpinner />
+    </div>
+}
+else
+{
+    <!-- Stat Grid -->
+    <div class="row mb-4 animate__animated animate__fadeInUp">
+        <div class="col-md-4 mb-3">
+            <div class="card glass-card p-4 border-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="d-block small text-muted fw-bold">TOTAL REVENUE (YTD)</span>
+                        <h2 class="text-green fw-bold m-0 mt-1">Rs @(revenue?.Sum(r => r.Total).ToString("N0") ?? "0")</h2>
+                    </div>
+                    <div class="p-3 bg-green-light rounded-circle text-green shadow-sm">
+                        <i class="bi bi-wallet2 fs-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small">Collected across all active tenancies</div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card glass-card p-4 border-0 shadow-sm" style="border-left: 4px solid var(--color-teal) !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="d-block small text-muted fw-bold">PORTFOLIO OCCUPANCY</span>
+                        <h2 class="text-teal fw-bold m-0 mt-1">@occupancyRate%</h2>
+                    </div>
+                    <div class="p-3 bg-teal-light rounded-circle text-teal shadow-sm">
+                        <i class="bi bi-percent fs-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small">@occupiedUnits occupied of @totalUnits total units</div>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <div class="card glass-card p-4 border-0 shadow-sm" style="border-left: 4px solid var(--color-danger) !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="d-block small text-muted fw-bold">OUTSTANDING ARREARS</span>
+                        <h2 class="text-danger fw-bold m-0 mt-1">Rs @(latePayments?.Sum(l => l.Amount + l.LateFee).ToString("N0") ?? "0")</h2>
+                    </div>
+                    <div class="p-3 bg-red-light rounded-circle text-danger shadow-sm">
+                        <i class="bi bi-clock-history fs-4"></i>
+                    </div>
+                </div>
+                <div class="mt-3 text-muted small">Accumulating surcharge fees on late dues</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue overview chart -->
+    <div class="row mb-4 animate__animated animate__fadeInUp">
+        <div class="col-12">
+            <div class="card glass-card p-4 border-0 shadow-sm">
+                <h4 class="text-navy fw-bold mb-3 border-bottom pb-2">Revenue History</h4>
+                <div style="height: 350px; position: relative;">
+                    <canvas id="fullRevenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Arrears details table -->
+    <div class="row animate__animated animate__fadeInUp">
+        <div class="col-12">
+            <div class="card glass-card p-4 border-0 shadow-sm">
+                <h4 class="text-navy fw-bold mb-4 border-bottom pb-2">Unpaid & Late Rent Ledgers</h4>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Tenant</th>
+                                <th>Unit Number</th>
+                                <th>Overdue Since</th>
+                                <th>Original Rent</th>
+                                <th>Late Penalty</th>
+                                <th>Total Overdue</th>
+                                <th class="text-end">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (latePayments == null || !latePayments.Any())
+                            {
+                                <tr>
+                                    <td colspan="7" class="text-center py-5 text-green fw-bold">
+                                        <i class="bi bi-shield-check fs-1 d-block mb-3"></i>
+                                        Excellent! No outstanding arrears on your portfolio.
+                                    </td>
+                                </tr>
+                            }
+                            else
+                            {
+                                @foreach (var late in latePayments)
+                                {
+                                    <tr class="hover-row">
+                                        <td class="fw-bold text-navy">@late.TenantName</td>
+                                        <td>
+                                            <span class="badge bg-teal bg-opacity-10 text-teal px-3 py-2 rounded-pill fw-bold">
+                                                Unit @late.UnitNumber
+                                            </span>
+                                        </td>
+                                        <td>@late.DaysOverdue Days Ago</td>
+                                        <td>Rs @late.Amount.ToString("N0")</td>
+                                        <td class="text-danger fw-bold">+Rs @late.LateFee.ToString("N0")</td>
+                                        <td class="text-danger fw-bold fs-6">Rs @((late.Amount + late.LateFee).ToString("N0"))</td>
+                                        <td class="text-end">
+                                            <span class="badge bg-red bg-opacity-15 text-danger px-3 py-2 rounded-pill fw-bold">OVERDUE</span>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.85);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+    }
+    .hover-row:hover {
+        background-color: var(--color-gray-100) !important;
+    }
+    .bg-teal-light { background-color: var(--color-teal-light); }
+    .bg-green-light { background-color: var(--color-green-light); }
+    .bg-red-light { background-color: var(--color-red-light); }
+    .text-teal { color: var(--color-teal); }
+    .text-green { color: var(--color-green); }
+</style>
+
+@code {
+    private List<RevenueItem>? revenue;
+    private List<LatePaymentItem>? latePayments;
+    private List<PropertyView>? properties;
+    private bool isLoading = true;
+
+    // Computed Stats
+    private int totalUnits = 0;
+    private int occupiedUnits = 0;
+    private double occupancyRate = 0;
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tasks = new List<Task>
+        {
+            Task.Run(async () => revenue = await PaymentService.GetLandlordRevenue()),
+            Task.Run(async () => latePayments = await PaymentService.GetLatePayments()),
+            Task.Run(async () => properties = await PropertyService.GetProperties())
+        };
+
+        await Task.WhenAll(tasks);
+
+        if (properties != null)
+        {
+            // Gather units count using detailed properties fetch
+            foreach (var prop in properties)
+            {
+                var details = await PropertyService.GetProperty(prop.Id);
+                if (details != null)
+                {
+                    totalUnits += details.Units.Count;
+                    occupiedUnits += details.Units.Count(u => u.IsOccupied);
+                }
+            }
+            occupancyRate = totalUnits > 0 ? Math.Round((double)occupiedUnits / totalUnits * 100) : 0;
+        }
+
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading && revenue != null && revenue.Count > 0)
+        {
+            var labels = revenue.Select(r => r.Label).ToArray();
+            var data = revenue.Select(r => r.Total).ToArray();
+            await JSRuntime.InvokeVoidAsync("renderBarChart", "fullRevenueChart", labels, data);
+        }
+    }
+}

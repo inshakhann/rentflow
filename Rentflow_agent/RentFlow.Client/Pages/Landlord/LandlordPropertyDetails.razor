@@ -1,82 +1,139 @@
 @page "/landlord/properties/{Id:int}"
 @using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
 @attribute [Authorize(Roles = "Landlord")]
 @inject PropertyService PropertyService
 @inject NavigationManager NavigationManager
+@inject ToastService ToastService
 
 <PageTitle>Property Details</PageTitle>
 
 @if (property == null)
 {
-    <LoadingSpinner />
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+        <LoadingSpinner />
+    </div>
 }
 else
 {
-    <div class="d-flex align-items-center mb-4">
+    <div class="d-flex align-items-center mb-4 animate__animated animate__fadeIn">
         <button class="btn btn-link text-navy p-0 me-3" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>
             <i class="bi bi-arrow-left fs-4"></i>
         </button>
-        <h2 class="mb-0">@property.Name</h2>
+        <div>
+            <h2 class="text-navy fw-bold mb-0">@property.Name</h2>
+            <small class="text-muted">Detailed view, unit profiles, and map positioning</small>
+        </div>
     </div>
 
-    <div class="row">
-        <div class="col-md-4 mb-4">
-            <div class="form-card h-100">
-                <h4 class="mb-4">Details</h4>
-                <p><strong>Address:</strong><br>@property.Address</p>
-                <p><strong>Total Units:</strong> @property.Units.Count</p>
-                <p><strong>Occupied:</strong> @property.Units.Count(u => u.IsOccupied)</p>
-                <p><strong>Vacant:</strong> @property.Units.Count(u => !u.IsOccupied)</p>
-                
-                @if (property.Latitude.HasValue && property.Longitude.HasValue)
-                {
-                    <div class="mt-4 p-3 bg-light rounded text-center">
-                        <i class="bi bi-map text-muted mb-2 fs-3"></i>
-                        <div class="small text-muted">Map Location: @property.Latitude, @property.Longitude</div>
+    <div class="row animate__animated animate__fadeInUp">
+        <!-- Details Card & Map -->
+        <div class="col-lg-4 mb-4">
+            <div class="card glass-card p-4 border-0 shadow-sm mb-4">
+                <h4 class="text-navy fw-bold mb-4 border-bottom pb-2">Overview</h4>
+                <div class="mb-3">
+                    <span class="d-block small text-muted">ADDRESS</span>
+                    <strong class="text-navy">@property.Address, @property.City</strong>
+                </div>
+                <div class="row mt-4">
+                    <div class="col-6 mb-3">
+                        <span class="d-block small text-muted">TOTAL UNITS</span>
+                        <h4 class="text-navy fw-bold m-0">@property.Units.Count</h4>
                     </div>
-                }
+                    <div class="col-6 mb-3">
+                        <span class="d-block small text-muted">OCCUPIED</span>
+                        <h4 class="text-green fw-bold m-0">@property.Units.Count(u => u.IsOccupied)</h4>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <span class="d-block small text-muted">VACANT</span>
+                        <h4 class="text-teal fw-bold m-0">@property.Units.Count(u => !u.IsOccupied)</h4>
+                    </div>
+                    <div class="col-6 mb-3">
+                        <span class="d-block small text-muted">OCCUPANCY %</span>
+                        <h4 class="text-navy fw-bold m-0">
+                            @(property.Units.Count > 0 ? Math.Round((double)property.Units.Count(u => u.IsOccupied) / property.Units.Count * 100) : 0)%
+                        </h4>
+                    </div>
+                </div>
             </div>
+
+            <!-- Embedded Google Map -->
+            @if (property.Latitude.HasValue && property.Longitude.HasValue)
+            {
+                <div class="card glass-card p-4 border-0 shadow-sm overflow-hidden">
+                    <h5 class="text-navy fw-bold mb-3"><i class="bi bi-map-fill text-teal me-2"></i>Location Map</h5>
+                    <div class="rounded-3 overflow-hidden shadow-sm" style="height: 250px;">
+                        <iframe 
+                            width="100%" 
+                            height="100%" 
+                            frameborder="0" 
+                            style="border:0;" 
+                            src="https://maps.google.com/maps?q=@(property.Latitude),@(property.Longitude)&t=&z=15&ie=UTF8&iwloc=&output=embed" 
+                            allowfullscreen>
+                        </iframe>
+                    </div>
+                    <div class="small text-muted mt-2 text-center">GPS: @property.Latitude, @property.Longitude</div>
+                </div>
+            }
         </div>
         
-        <div class="col-md-8 mb-4">
-            <div class="form-card h-100">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h4 class="mb-0">Units</h4>
-                    <button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus me-1"></i>Add Unit</button>
+        <!-- Units Card -->
+        <div class="col-lg-8 mb-4">
+            <div class="card glass-card p-4 border-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-2">
+                    <h4 class="text-navy fw-bold mb-0">Unit Directory</h4>
+                    <button class="btn btn-sm btn-teal rounded-pill px-3" @onclick="OpenAddModal">
+                        <i class="bi bi-plus-lg me-1"></i>Add Unit
+                    </button>
                 </div>
                 
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover align-middle">
                         <thead>
                             <tr>
-                                <th>Unit</th>
-                                <th>Rent</th>
+                                <th>Unit Number</th>
+                                <th>Rent Price</th>
+                                <th>Bedrooms</th>
                                 <th>Status</th>
-                                <th>Tenant</th>
-                                <th>Actions</th>
+                                <th>Assigned Tenant</th>
+                                <th class="text-end">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach (var unit in property.Units)
+                            @if (property.Units == null || !property.Units.Any())
                             {
                                 <tr>
-                                    <td><strong>@unit.UnitNumber</strong></td>
-                                    <td>Rs @unit.MonthlyRent.ToString("N0")</td>
-                                    <td>
-                                        @if (unit.IsOccupied)
-                                        {
-                                            <span class="badge-paid">Occupied</span>
-                                        }
-                                        else
-                                        {
-                                            <span class="badge bg-secondary">Vacant</span>
-                                        }
-                                    </td>
-                                    <td>@(unit.TenantName ?? "-")</td>
-                                    <td>
-                                        <button class="btn btn-sm btn-outline-navy">Edit</button>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        No units found. Add a unit to start renting!
                                     </td>
                                 </tr>
+                            }
+                            else
+                            {
+                                @foreach (var unit in property.Units)
+                                {
+                                    <tr class="hover-row">
+                                        <td class="fw-bold text-navy">@unit.UnitNumber</td>
+                                        <td class="fw-bold">Rs @unit.MonthlyRent.ToString("N0")</td>
+                                        <td>@unit.Bedrooms BR</td>
+                                        <td>
+                                            @if (unit.IsOccupied)
+                                            {
+                                                <span class="badge-paid">Occupied</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary rounded-pill px-3 py-2 text-white">Vacant</span>
+                                            }
+                                        </td>
+                                        <td class="text-muted fw-bold">@(unit.TenantName ?? "-")</td>
+                                        <td class="text-end">
+                                            <button class="btn btn-sm btn-outline-navy rounded-pill px-3" @onclick="() => OpenEditModal(unit)">
+                                                <i class="bi bi-pencil-square me-1"></i>Edit
+                                            </button>
+                                        </td>
+                                    </tr>
+                                }
                             }
                         </tbody>
                     </table>
@@ -86,16 +143,175 @@ else
     </div>
 }
 
+<!-- Dynamic Bootstrap Modal for Add/Edit Unit -->
+@if (showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-card border-0 shadow-lg p-3">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title text-navy fw-bold">@modalTitle</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body py-3">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Unit Designation / Number</label>
+                        <input type="text" class="form-control p-3 bg-light border-0" @bind="unitModel.UnitNumber" placeholder="e.g. Apartment 1A" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Monthly Rent (PKR)</label>
+                        <input type="number" class="form-control p-3 bg-light border-0" @bind="unitModel.MonthlyRent" placeholder="e.g. 60000" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label text-muted small fw-bold">Bedrooms Count</label>
+                        <select class="form-select p-3 bg-light border-0" @bind="unitModel.Bedrooms">
+                            <option value="1">1 Bedroom / Studio</option>
+                            <option value="2">2 Bedrooms</option>
+                            <option value="3">3 Bedrooms</option>
+                            <option value="4">4+ Bedrooms</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 d-flex justify-content-end gap-2">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" @onclick="CloseModal">Close</button>
+                    <button type="button" class="btn btn-teal rounded-pill px-4" @onclick="SaveUnit" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span>Save Unit</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<style>
+    .glass-card {
+        background: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 16px !important;
+    }
+    .btn-teal {
+        background-color: var(--color-teal);
+        color: var(--color-white);
+    }
+    .btn-teal:hover {
+        background-color: #0284c7;
+        color: var(--color-white);
+    }
+    .hover-row:hover {
+        background-color: var(--color-gray-100) !important;
+    }
+</style>
+
 @code {
     [Parameter] public int Id { get; set; }
     private PropertyDetailView? property;
 
+    // Modal state
+    private bool showModal = false;
+    private string modalTitle = "Add New Unit";
+    private UnitDto unitModel = new();
+    private bool isSaving = false;
+    private bool isEditing = false;
+
     protected override async Task OnInitializedAsync()
+    {
+        await LoadProperty();
+    }
+
+    private async Task LoadProperty()
     {
         property = await PropertyService.GetProperty(Id);
         if (property == null)
         {
             NavigationManager.NavigateTo("/landlord/properties");
+        }
+    }
+
+    private void OpenAddModal()
+    {
+        unitModel = new UnitDto { Bedrooms = 1, MonthlyRent = 50000 };
+        modalTitle = "Add New Unit";
+        isEditing = false;
+        showModal = true;
+    }
+
+    private void OpenEditModal(UnitView unit)
+    {
+        unitModel = new UnitDto 
+        { 
+            Id = unit.Id,
+            PropertyId = Id,
+            UnitNumber = unit.UnitNumber,
+            MonthlyRent = unit.MonthlyRent,
+            IsOccupied = unit.IsOccupied
+        };
+        modalTitle = $"Edit Unit - {unit.UnitNumber}";
+        isEditing = true;
+        showModal = true;
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+    }
+
+    private async Task SaveUnit()
+    {
+        if (string.IsNullOrWhiteSpace(unitModel.UnitNumber))
+        {
+            ToastService.ShowError("Please enter a valid unit number.");
+            return;
+        }
+
+        if (unitModel.MonthlyRent <= 0)
+        {
+            ToastService.ShowError("Monthly Rent must be greater than zero.");
+            return;
+        }
+
+        isSaving = true;
+        StateHasChanged();
+
+        try
+        {
+            bool success;
+            if (isEditing)
+            {
+                success = await PropertyService.UpdateUnit(unitModel.Id, unitModel);
+            }
+            else
+            {
+                success = await PropertyService.CreateUnit(Id, unitModel);
+            }
+
+            if (success)
+            {
+                ToastService.ShowSuccess(isEditing ? "Unit details updated!" : "New unit added!");
+                showModal = false;
+                await LoadProperty();
+            }
+            else
+            {
+                ToastService.ShowError("Failed to save unit. Verify inputs and try again.");
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("A system error occurred while processing unit data.");
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
         }
     }
 }
