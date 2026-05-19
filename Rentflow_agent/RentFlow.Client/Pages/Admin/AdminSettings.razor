@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject ToastService ToastService
+@inject AdminService AdminService
 
 <PageTitle>System Settings</PageTitle>
 
@@ -16,15 +17,15 @@
                 <input type="number" class="form-control" @bind="lateFeePercent" min="1" max="100">
                 <small class="text-muted">Applied to base rent amount</small>
             </div>
-            
+
             <div class="mb-4">
                 <label class="form-label text-muted">Fee Trigger Day of Month</label>
                 <input type="number" class="form-control" @bind="triggerDay" min="1" max="28">
                 <small class="text-muted">e.g. '5' means fee is applied on the 5th of every month</small>
             </div>
-            
+
             <hr class="my-4">
-            
+
             <h4 class="mb-4 text-navy">Weather Alert Polling</h4>
             <div class="mb-4">
                 <label class="form-label text-muted">Check Interval (Hours)</label>
@@ -34,7 +35,11 @@
             <button class="btn btn-primary" @onclick="SaveSettings">
                 <i class="bi bi-save me-2"></i> Save Settings
             </button>
-            <button class="btn btn-outline-amber ms-2">
+            <button class="btn btn-outline-amber ms-2" @onclick="TriggerWeatherCheck" disabled="@isTriggeringWeatherCheck">
+                @if (isTriggeringWeatherCheck)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                }
                 <i class="bi bi-cloud-download me-2"></i> Trigger Weather Check Now
             </button>
         </div>
@@ -45,10 +50,33 @@
     private int lateFeePercent = 5;
     private int triggerDay = 5;
     private int weatherInterval = 6;
+    private bool isTriggeringWeatherCheck;
 
     private void SaveSettings()
     {
-        // In a real app, these would be saved to a database table or appsettings
+        // In a real app, these would be saved to a database table or appsettings.
         ToastService.ShowSuccess("Settings saved successfully.");
+    }
+
+    private async Task TriggerWeatherCheck()
+    {
+        isTriggeringWeatherCheck = true;
+        var result = await AdminService.TriggerWeatherCheck();
+        isTriggeringWeatherCheck = false;
+
+        if (result == null)
+        {
+            ToastService.ShowError("Weather check failed. Please try again.");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(result.Message))
+        {
+            ToastService.ShowInfo(result.Message);
+        }
+        else
+        {
+            ToastService.ShowSuccess($"Weather check complete. Added {result.Added} alerts across {result.Checked} properties.");
+        }
     }
 }

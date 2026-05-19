@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject AdminService AdminService
+@inject ToastService ToastService
 
 <PageTitle>Manage Tenants</PageTitle>
 
@@ -59,7 +60,9 @@ else
                                 }
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-navy">View</button>
+                                <button class="btn btn-sm btn-outline-navy" @onclick="() => OpenTenantDetails(tenant.Id)">
+                                    View
+                                </button>
                             </td>
                         </tr>
                     }
@@ -75,17 +78,82 @@ else
     </div>
 }
 
+@if (showDetailsModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.45);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Tenant Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDetailsModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (selectedTenantDetails == null)
+                    {
+                        <div class="text-center py-3"><span class="spinner-border text-teal"></span></div>
+                    }
+                    else
+                    {
+                        <div class="mb-2"><strong>Name:</strong> @selectedTenantDetails.FullName</div>
+                        <div class="mb-2"><strong>Email:</strong> @selectedTenantDetails.Email</div>
+                        <div class="mb-2"><strong>Status:</strong> @(selectedTenantDetails.IsActive ? "Active" : "Inactive")</div>
+                        <div class="mb-3"><strong>Joined:</strong> @selectedTenantDetails.CreatedAt.ToString("MMM dd, yyyy")</div>
+
+                        @if (selectedTenantDetails.ActiveLease != null)
+                        {
+                            <hr />
+                            <div class="mb-2"><strong>Property:</strong> @selectedTenantDetails.ActiveLease.PropertyName</div>
+                            <div class="mb-2"><strong>Unit:</strong> @selectedTenantDetails.ActiveLease.UnitNumber</div>
+                            <div class="mb-2"><strong>Landlord:</strong> @selectedTenantDetails.ActiveLease.LandlordName</div>
+                            <div class="mb-2"><strong>Lease Start:</strong> @selectedTenantDetails.ActiveLease.StartDate.ToString("MMM dd, yyyy")</div>
+                            <div class="mb-2"><strong>Lease End:</strong> @(selectedTenantDetails.ActiveLease.EndDate?.ToString("MMM dd, yyyy") ?? "Ongoing")</div>
+                            <div><strong>Monthly Rent:</strong> Rs @selectedTenantDetails.ActiveLease.MonthlyRent.ToString("N0")</div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-secondary py-2 mb-0">No active lease assigned.</div>
+                        }
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseDetailsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<TenantView>? tenants;
     private string searchTerm = "";
+    private bool showDetailsModal = false;
+    private TenantDetailView? selectedTenantDetails;
 
-    private IEnumerable<TenantView> FilteredTenants => tenants?.Where(t => 
-        string.IsNullOrWhiteSpace(searchTerm) || 
-        t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+    private IEnumerable<TenantView> FilteredTenants => tenants?.Where(t =>
+        string.IsNullOrWhiteSpace(searchTerm) ||
+        t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
         t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ?? Array.Empty<TenantView>();
 
     protected override async Task OnInitializedAsync()
     {
         tenants = await AdminService.GetTenants();
+    }
+
+    private async Task OpenTenantDetails(int tenantId)
+    {
+        showDetailsModal = true;
+        selectedTenantDetails = null;
+        selectedTenantDetails = await AdminService.GetTenantDetails(tenantId);
+
+        if (selectedTenantDetails == null)
+        {
+            ToastService.ShowError("Unable to load tenant details.");
+        }
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedTenantDetails = null;
     }
 }

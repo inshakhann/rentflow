@@ -2,6 +2,7 @@
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 @inject AdminService AdminService
+@inject ToastService ToastService
 
 <PageTitle>Manage Landlords</PageTitle>
 
@@ -49,8 +50,18 @@ else
                                 }
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-outline-navy">View</button>
-                                <button class="btn btn-sm btn-outline-danger ms-2">Suspend</button>
+                                <button class="btn btn-sm btn-outline-navy" @onclick="() => OpenLandlordDetails(landlord.Id)">
+                                    View
+                                </button>
+                                <button class="btn btn-sm @(landlord.IsActive ? "btn-outline-danger" : "btn-outline-success") ms-2"
+                                        disabled="@(statusUpdatingId == landlord.Id)"
+                                        @onclick="() => ToggleLandlordStatus(landlord)">
+                                    @if (statusUpdatingId == landlord.Id)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+                                    }
+                                    @(landlord.IsActive ? "Suspend" : "Activate")
+                                </button>
                             </td>
                         </tr>
                     }
@@ -66,17 +77,90 @@ else
     </div>
 }
 
+@if (showDetailsModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.45);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Landlord Details</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDetailsModal"></button>
+                </div>
+                <div class="modal-body">
+                    @if (selectedLandlordDetails == null)
+                    {
+                        <div class="text-center py-3"><span class="spinner-border text-teal"></span></div>
+                    }
+                    else
+                    {
+                        <div class="mb-2"><strong>Name:</strong> @selectedLandlordDetails.FullName</div>
+                        <div class="mb-2"><strong>Email:</strong> @selectedLandlordDetails.Email</div>
+                        <div class="mb-2"><strong>Status:</strong> @(selectedLandlordDetails.IsActive ? "Active" : "Suspended")</div>
+                        <div class="mb-2"><strong>Joined:</strong> @selectedLandlordDetails.CreatedAt.ToString("MMM dd, yyyy")</div>
+                        <div class="mb-2"><strong>Properties:</strong> @selectedLandlordDetails.PropertiesCount</div>
+                        <div class="mb-2"><strong>Total Units:</strong> @selectedLandlordDetails.ActiveUnits</div>
+                        <div><strong>Occupied Units:</strong> @selectedLandlordDetails.OccupiedUnits</div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseDetailsModal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private List<LandlordView>? landlords;
     private string searchTerm = "";
+    private bool showDetailsModal = false;
+    private LandlordDetailView? selectedLandlordDetails;
+    private int? statusUpdatingId;
 
-    private IEnumerable<LandlordView> FilteredLandlords => landlords?.Where(l => 
-        string.IsNullOrWhiteSpace(searchTerm) || 
-        l.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+    private IEnumerable<LandlordView> FilteredLandlords => landlords?.Where(l =>
+        string.IsNullOrWhiteSpace(searchTerm) ||
+        l.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
         l.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ?? Array.Empty<LandlordView>();
 
     protected override async Task OnInitializedAsync()
     {
         landlords = await AdminService.GetLandlords();
+    }
+
+    private async Task OpenLandlordDetails(int landlordId)
+    {
+        showDetailsModal = true;
+        selectedLandlordDetails = null;
+        selectedLandlordDetails = await AdminService.GetLandlordDetails(landlordId);
+
+        if (selectedLandlordDetails == null)
+        {
+            ToastService.ShowError("Unable to load landlord details.");
+        }
+    }
+
+    private void CloseDetailsModal()
+    {
+        showDetailsModal = false;
+        selectedLandlordDetails = null;
+    }
+
+    private async Task ToggleLandlordStatus(LandlordView landlord)
+    {
+        statusUpdatingId = landlord.Id;
+        var nextState = !landlord.IsActive;
+        var ok = await AdminService.UpdateLandlordStatus(landlord.Id, nextState);
+
+        if (ok)
+        {
+            landlord.IsActive = nextState;
+            ToastService.ShowSuccess(nextState ? "Landlord activated." : "Landlord suspended.");
+        }
+        else
+        {
+            ToastService.ShowError("Unable to update landlord status.");
+        }
+
+        statusUpdatingId = null;
     }
 }
