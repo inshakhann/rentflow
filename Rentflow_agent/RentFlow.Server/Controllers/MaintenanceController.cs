@@ -106,6 +106,23 @@ namespace RentFlow.Server.Controllers
             _context.MaintenanceTickets.Add(ticket);
             await _context.SaveChangesAsync();
 
+            var landlordId = await _context.Properties
+                .Where(p => p.Id == ticket.PropertyId)
+                .Select(p => p.LandlordId)
+                .FirstOrDefaultAsync();
+
+            if (landlordId > 0)
+            {
+                _context.Notifications.Add(new Notification
+                {
+                    UserId = landlordId,
+                    Title = "New Maintenance Ticket",
+                    Message = $"A new {ticket.Category} ticket was submitted for unit #{lease.Unit.UnitNumber}.",
+                    Type = "Ticket"
+                });
+                await _context.SaveChangesAsync();
+            }
+
             return Ok(new { ticket.Id });
         }
 

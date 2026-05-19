@@ -52,6 +52,8 @@ namespace RentFlow.Server.Services
             // Find all pending payments past their due date
             var overduePayments = await context.Payments
                 .Include(p => p.Lease)
+                .ThenInclude(l => l.Unit)
+                .ThenInclude(u => u.Property)
                 .Where(p => p.Status == "Pending" && p.DueDate < DateTime.UtcNow.Date)
                 .ToListAsync(stoppingToken);
 
@@ -63,6 +65,24 @@ namespace RentFlow.Server.Services
                 
                 payment.Status = "Late";
                 payment.LateFee = penalty;
+
+                context.Notifications.Add(new Notification
+                {
+                    UserId = payment.TenantId,
+                    Title = "Rent Marked Late",
+                    Message = $"Your rent due on {payment.DueDate:MMM dd, yyyy} is now late. Late fee applied: Rs {penalty:N0}.",
+                    Type = "LateFee"
+                });
+
+                var landlordId = payment.Lease.Unit.Property.LandlordId;
+                context.Notifications.Add(new Notification
+                {
+                    UserId = landlordId,
+                    Title = "Late Rent Alert",
+                    Message = $"Tenant #{payment.TenantId} has an overdue payment for due date {payment.DueDate:MMM dd, yyyy}.",
+                    Type = "LateFee"
+                });
+
                 count++;
             }
 
