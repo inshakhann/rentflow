@@ -45,6 +45,12 @@ namespace RentFlow.Server.Controllers
             if (registerDto.Role == "Admin")
                 return BadRequest("Cannot register as Admin.");
 
+            if (registerDto.Role != "Landlord" && registerDto.Role != "Tenant")
+                return BadRequest("Role must be either Landlord or Tenant.");
+
+            if (registerDto.Password != registerDto.ConfirmPassword)
+                return BadRequest("Passwords do not match.");
+
             if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
                 return BadRequest("Email already exists.");
 
