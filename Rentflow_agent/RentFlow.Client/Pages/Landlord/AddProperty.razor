@@ -1,0 +1,104 @@
+@page "/landlord/properties/add"
+@using Microsoft.AspNetCore.Authorization
+@using RentFlow.Shared.DTOs
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+
+<PageTitle>Add New Property</PageTitle>
+
+<div class="d-flex align-items-center mb-4">
+    <button class="btn btn-link text-navy p-0 me-3" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>
+        <i class="bi bi-arrow-left fs-4"></i>
+    </button>
+    <h2 class="mb-0">Add New Property</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-8 col-lg-6">
+        <div class="form-card">
+            <EditForm Model="propertyModel" OnValidSubmit="HandleSubmit">
+                <DataAnnotationsValidator />
+                
+                <div class="mb-3">
+                    <label class="form-label text-muted">Property Name</label>
+                    <InputText @bind-Value="propertyModel.Name" class="form-control" placeholder="e.g. Sunny Apartments" required />
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-muted">Address</label>
+                    <InputText @bind-Value="propertyModel.Address" class="form-control" placeholder="123 Main St" required />
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label text-muted">City</label>
+                    <InputText @bind-Value="propertyModel.City" class="form-control" placeholder="New York" required />
+                </div>
+                
+                <div class="mb-4">
+                    <label class="form-label text-muted">Total Units</label>
+                    <InputNumber @bind-Value="propertyModel.TotalUnits" class="form-control" min="1" max="100" required />
+                    <div class="form-text">Units will be automatically generated.</div>
+                </div>
+                
+                <h5 class="mb-3">Map Coordinates (Optional)</h5>
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <label class="form-label text-muted">Latitude</label>
+                        <InputNumber @bind-Value="propertyModel.Latitude" class="form-control" />
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label text-muted">Longitude</label>
+                        <InputNumber @bind-Value="propertyModel.Longitude" class="form-control" />
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end mt-4">
+                    <button type="button" class="btn btn-outline-secondary me-2" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>Cancel</button>
+                    <button type="submit" class="btn btn-primary px-4" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            <span>Saving...</span>
+                        }
+                        else
+                        {
+                            <span><i class="bi bi-save me-2"></i>Save Property</span>
+                        }
+                    </button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private PropertyDto propertyModel = new PropertyDto { TotalUnits = 1 };
+    private bool isSubmitting = false;
+
+    private async Task HandleSubmit()
+    {
+        isSubmitting = true;
+        
+        try
+        {
+            var newId = await PropertyService.CreateProperty(propertyModel);
+            if (newId > 0)
+            {
+                ToastService.ShowSuccess("Property created successfully!");
+                NavigationManager.NavigateTo($"/landlord/properties/{newId}");
+            }
+            else
+            {
+                ToastService.ShowError("Failed to create property. Please try again.");
+                isSubmitting = false;
+            }
+        }
+        catch (Exception)
+        {
+            ToastService.ShowError("An unexpected error occurred.");
+            isSubmitting = false;
+        }
+    }
+}

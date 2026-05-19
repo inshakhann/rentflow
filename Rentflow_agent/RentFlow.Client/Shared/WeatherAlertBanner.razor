@@ -1,0 +1,16 @@
+<div class="weather-alert mb-0">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+        <div>
+            <strong>Weather Alert:</strong> @Message
+        </div>
+    </div>
+    <button class="btn btn-sm btn-link text-amber-800 p-0" style="color: #92400e;" @onclick="OnDismiss">
+        <i class="bi bi-x-lg"></i>
+    </button>
+</div>
+
+@code {
+    [Parameter] public string Message { get; set; } = "Adverse weather conditions detected.";
+    [Parameter] public EventCallback OnDismiss { get; set; }
+}

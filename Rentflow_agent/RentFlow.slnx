@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="RentFlow.Client/RentFlow.Client.csproj" />
+  <Project Path="RentFlow.Server/RentFlow.Server.csproj" />
+  <Project Path="RentFlow.Shared/RentFlow.Shared.csproj" />
+</Solution>

@@ -1,0 +1,118 @@
+@page "/register"
+@using RentFlow.Shared.DTOs
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+
+<div class="d-flex align-items-center justify-content-center py-5" style="min-height: 100vh; background-color: var(--color-navy);">
+    <div class="form-card" style="width: 100%; max-width: 480px;">
+        <div class="text-center mb-4">
+            <h1 class="h2 text-navy mb-1">RentFlow</h1>
+            <p class="text-muted">Create an account</p>
+        </div>
+
+        @if (ShowError)
+        {
+            <div class="alert alert-danger p-2 mb-4">
+                Registration failed. Email might already be in use.
+            </div>
+        }
+        
+        @if (PasswordMismatch)
+        {
+            <div class="alert alert-danger p-2 mb-4">
+                Passwords do not match.
+            </div>
+        }
+
+        <EditForm Model="registerModel" OnValidSubmit="HandleRegister">
+            <DataAnnotationsValidator />
+            
+            <div class="mb-3">
+                <label class="form-label text-muted">Full Name</label>
+                <InputText @bind-Value="registerModel.FullName" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted">Email</label>
+                <InputText @bind-Value="registerModel.Email" class="form-control" type="email" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted">Role</label>
+                <InputSelect @bind-Value="registerModel.Role" class="form-select" required>
+                    <option value="">Select a role...</option>
+                    <option value="Landlord">Landlord</option>
+                    <option value="Tenant">Tenant</option>
+                </InputSelect>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label text-muted">Password (min 8 chars)</label>
+                <InputText @bind-Value="registerModel.Password" class="form-control" type="password" required />
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label text-muted">Confirm Password</label>
+                <InputText @bind-Value="registerModel.ConfirmPassword" class="form-control" type="password" required />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" style="height: 44px;" disabled="@IsLoading">
+                @if (IsLoading)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <span>Register</span>
+                }
+            </button>
+            
+            <div class="text-center mt-4">
+                <a href="/login" class="text-decoration-none" style="color: var(--color-teal);">Already have an account? Sign in</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private RegisterDto registerModel = new();
+    private bool IsLoading = false;
+    private bool ShowError = false;
+    private bool PasswordMismatch = false;
+
+    private async Task HandleRegister()
+    {
+        ShowError = false;
+        PasswordMismatch = false;
+        
+        if (registerModel.Password.Length < 8)
+        {
+            ToastService.ShowError("Password must be at least 8 characters long.");
+            return;
+        }
+
+        if (registerModel.Password != registerModel.ConfirmPassword)
+        {
+            PasswordMismatch = true;
+            return;
+        }
+
+        IsLoading = true;
+        
+        var role = await AuthService.Register(registerModel);
+        
+        if (role != null)
+        {
+            ToastService.ShowSuccess("Registration successful!");
+            
+            if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard");
+            else NavigationManager.NavigateTo("/tenant/dashboard");
+        }
+        else
+        {
+            ShowError = true;
+            IsLoading = false;
+        }
+    }
+}

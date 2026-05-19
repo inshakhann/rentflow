@@ -1,0 +1,59 @@
+@page "/admin/properties"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminService AdminService
+
+<PageTitle>All Properties</PageTitle>
+
+<h2 class="mb-4">All Properties</h2>
+
+@if (properties == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="form-card">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Address</th>
+                        <th>Landlord</th>
+                        <th>Total Units</th>
+                        <th>Occupancy</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var prop in properties)
+                    {
+                        <tr>
+                            <td><strong>@prop.Name</strong></td>
+                            <td>@prop.Address</td>
+                            <td>@prop.LandlordName</td>
+                            <td>@prop.TotalUnits</td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                                        <div class="progress-bar bg-teal" role="progressbar" style="width: @prop.OccupancyPercent%"></div>
+                                    </div>
+                                    <span style="min-width: 40px; font-size: 12px;">@(Math.Round(prop.OccupancyPercent))%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PropertyView>? properties;
+
+    protected override async Task OnInitializedAsync()
+    {
+        properties = await AdminService.GetProperties();
+    }
+}

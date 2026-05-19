@@ -1,0 +1,82 @@
+@page "/admin/landlords"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminService AdminService
+
+<PageTitle>Manage Landlords</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Landlords</h2>
+    <div class="input-group" style="max-width: 300px;">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" placeholder="Search landlords..." @bind="searchTerm" @bind:event="oninput">
+    </div>
+</div>
+
+@if (landlords == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="form-card">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Properties</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var landlord in FilteredLandlords)
+                    {
+                        <tr>
+                            <td>@landlord.FullName</td>
+                            <td>@landlord.Email</td>
+                            <td>@landlord.PropertiesCount</td>
+                            <td>
+                                @if (landlord.IsActive)
+                                {
+                                    <span class="badge-paid">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-late">Suspended</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-navy">View</button>
+                                <button class="btn btn-sm btn-outline-danger ms-2">Suspend</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredLandlords.Any())
+                    {
+                        <tr>
+                            <td colspan="5" class="text-center py-4">No landlords found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LandlordView>? landlords;
+    private string searchTerm = "";
+
+    private IEnumerable<LandlordView> FilteredLandlords => landlords?.Where(l => 
+        string.IsNullOrWhiteSpace(searchTerm) || 
+        l.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+        l.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ?? Array.Empty<LandlordView>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        landlords = await AdminService.GetLandlords();
+    }
+}

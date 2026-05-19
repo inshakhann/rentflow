@@ -1,0 +1,159 @@
+@page "/tenant/maintenance"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Tenant")]
+@inject MaintenanceService MaintenanceService
+
+<PageTitle>Maintenance</PageTitle>
+
+<div class="row">
+    <div class="col-lg-7 mb-4">
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-robot text-teal fs-3 me-3"></i>
+                    <div>
+                        <h5 class="mb-0 text-navy">RentFlow Bot</h5>
+                        <small class="text-muted">AI Maintenance Assistant</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-messages">
+                <div class="chat-bubble bot">
+                    Hello! I'm the RentFlow AI assistant. Please describe the maintenance issue you're experiencing. (e.g., "The kitchen sink is leaking and water is everywhere")
+                </div>
+                
+                @foreach (var msg in messages)
+                {
+                    <div class="chat-bubble @msg.Role">
+                        @msg.Content
+                    </div>
+                }
+                
+                @if (isTyping)
+                {
+                    <div class="chat-bubble bot">
+                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
+                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
+                        <span class="spinner-grow spinner-grow-sm text-teal" role="status" aria-hidden="true"></span>
+                    </div>
+                }
+            </div>
+            
+            <div class="chat-input-area">
+                <div class="input-group">
+                    <input type="text" class="form-control" placeholder="Describe your issue..." @bind="userInput" @onkeyup="HandleKeyUp" disabled="@isTyping">
+                    <button class="btn btn-primary px-4" @onclick="SendMessage" disabled="@(string.IsNullOrWhiteSpace(userInput) || isTyping)">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-5 mb-4">
+        <div class="form-card h-100">
+            <h4 class="mb-4">My Tickets</h4>
+            
+            @if (tickets == null)
+            {
+                <LoadingSpinner />
+            }
+            else if (!tickets.Any())
+            {
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-clipboard2-check fs-1"></i>
+                    <p class="mt-3">You don't have any maintenance tickets.</p>
+                </div>
+            }
+            else
+            {
+                <div class="list-group list-group-flush">
+                    @foreach (var ticket in tickets)
+                    {
+                        <div class="list-group-item px-0 py-3">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <strong>Ticket #@ticket.Id</strong>
+                                @if (ticket.Status == "Open")
+                                {
+                                    <span class="badge-pending">Open</span>
+                                }
+                                else if (ticket.Status == "InProgress")
+                                {
+                                    <span class="badge bg-primary">In Progress</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-paid">Resolved</span>
+                                }
+                            </div>
+                            <div class="mb-1 text-truncate">@ticket.Description</div>
+                            <div class="d-flex justify-content-between align-items-center small text-muted">
+                                <span><i class="bi bi-tag me-1"></i>@ticket.Category</span>
+                                <span>@ticket.CreatedAt.ToString("MMM dd, yyyy")</span>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private List<TenantTicketView>? tickets;
+    private List<ChatMessage> messages = new();
+    private string userInput = "";
+    private bool isTyping = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTickets();
+    }
+
+    private async Task LoadTickets()
+    {
+        tickets = await MaintenanceService.GetTenantTickets();
+    }
+
+    private async Task HandleKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SendMessage();
+        }
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(userInput)) return;
+
+        messages.Add(new ChatMessage { Role = "user", Content = userInput });
+        var text = userInput;
+        userInput = "";
+        isTyping = true;
+        
+        // This is a placeholder for the actual Groq API call integration
+        await Task.Delay(1500); 
+        
+        messages.Add(new ChatMessage { Role = "bot", Content = "I have classified your issue as Plumbing (Urgency: Moderate). A maintenance ticket has been created automatically." });
+        
+        isTyping = false;
+        
+        // Auto create ticket locally as demo
+        await MaintenanceService.CreateTicket(new RentFlow.Shared.DTOs.MaintenanceTicketDto 
+        { 
+            Category = "Plumbing", 
+            Description = text,
+            Urgency = 2 
+        });
+        
+        await LoadTickets();
+    }
+
+    private class ChatMessage
+    {
+        public string Role { get; set; } = "";
+        public string Content { get; set; } = "";
+    }
+}

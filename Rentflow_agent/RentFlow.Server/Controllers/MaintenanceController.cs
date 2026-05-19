@@ -1,0 +1,104 @@
+using System.Linq;
+using System.Security.Claims;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using RentFlow.Server.Data;
+using RentFlow.Shared.DTOs;
+using RentFlow.Shared.Models;
+
+namespace RentFlow.Server.Controllers
+{
+    [Authorize]
+    [ApiController]
+    [Route("api/[controller]")]
+    public class MaintenanceController : ControllerBase
+    {
+        private readonly AppDbContext _context;
+
+        public MaintenanceController(AppDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet("landlord")]
+        public async Task<IActionResult> GetLandlordTickets()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var tickets = await _context.MaintenanceTickets
+                .Include(t => t.Property)
+                .Include(t => t.Tenant)
+                .Where(t => t.Property.LandlordId == userId)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.Category,
+                    t.Description,
+                    t.Status,
+                    t.Urgency,
+                    t.CreatedAt,
+                    PropertyName = t.Property.Name,
+                    TenantName = t.Tenant.FullName,
+                    t.AssignedTo
+                })
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return Ok(tickets);
+        }
+
+        [HttpGet("tenant")]
+        public async Task<IActionResult> GetTenantTickets()
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+
+            var tickets = await _context.MaintenanceTickets
+                .Where(t => t.TenantId == userId)
+                .Select(t => new
+                {
+                    t.Id,
+                    t.Category,
+                    t.Description,
+                    t.Status,
+                    t.Urgency,
+                    t.CreatedAt
+                })
+                .OrderByDescending(t => t.CreatedAt)
+                .ToListAsync();
+
+            return Ok(tickets);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> CreateTicket([FromBody] MaintenanceTicketDto dto)
+        {
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            
+            // Get tenant's active lease to find property and unit
+            var lease = await _context.Leases
+                .Include(l => l.Unit)
+                .FirstOrDefaultAsync(l => l.TenantId == userId && l.IsActive);
+                
+            if (lease == null) return BadRequest("No active lease found.");
+
+            var ticket = new MaintenanceTicket
+            {
+                TenantId = userId,
+                PropertyId = lease.Unit.PropertyId,
+                UnitId = lease.UnitId,
+                Category = dto.Category,
+                Description = dto.Description,
+                Urgency = dto.Urgency,
+                Status = "Open",
+                BotTranscript = "{}" // Just a placeholder
+            };
+
+            _context.MaintenanceTickets.Add(ticket);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { ticket.Id });
+        }
+    }
+}

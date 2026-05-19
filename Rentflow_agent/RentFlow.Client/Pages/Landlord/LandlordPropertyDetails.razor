@@ -1,0 +1,101 @@
+@page "/landlord/properties/{Id:int}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Property Details</PageTitle>
+
+@if (property == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="d-flex align-items-center mb-4">
+        <button class="btn btn-link text-navy p-0 me-3" @onclick='() => NavigationManager.NavigateTo("/landlord/properties")'>
+            <i class="bi bi-arrow-left fs-4"></i>
+        </button>
+        <h2 class="mb-0">@property.Name</h2>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="form-card h-100">
+                <h4 class="mb-4">Details</h4>
+                <p><strong>Address:</strong><br>@property.Address</p>
+                <p><strong>Total Units:</strong> @property.Units.Count</p>
+                <p><strong>Occupied:</strong> @property.Units.Count(u => u.IsOccupied)</p>
+                <p><strong>Vacant:</strong> @property.Units.Count(u => !u.IsOccupied)</p>
+                
+                @if (property.Latitude.HasValue && property.Longitude.HasValue)
+                {
+                    <div class="mt-4 p-3 bg-light rounded text-center">
+                        <i class="bi bi-map text-muted mb-2 fs-3"></i>
+                        <div class="small text-muted">Map Location: @property.Latitude, @property.Longitude</div>
+                    </div>
+                }
+            </div>
+        </div>
+        
+        <div class="col-md-8 mb-4">
+            <div class="form-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h4 class="mb-0">Units</h4>
+                    <button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus me-1"></i>Add Unit</button>
+                </div>
+                
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Unit</th>
+                                <th>Rent</th>
+                                <th>Status</th>
+                                <th>Tenant</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var unit in property.Units)
+                            {
+                                <tr>
+                                    <td><strong>@unit.UnitNumber</strong></td>
+                                    <td>Rs @unit.MonthlyRent.ToString("N0")</td>
+                                    <td>
+                                        @if (unit.IsOccupied)
+                                        {
+                                            <span class="badge-paid">Occupied</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Vacant</span>
+                                        }
+                                    </td>
+                                    <td>@(unit.TenantName ?? "-")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-navy">Edit</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private PropertyDetailView? property;
+
+    protected override async Task OnInitializedAsync()
+    {
+        property = await PropertyService.GetProperty(Id);
+        if (property == null)
+        {
+            NavigationManager.NavigateTo("/landlord/properties");
+        }
+    }
+}

@@ -1,0 +1,90 @@
+@inherits LayoutComponentBase
+@inject NavigationManager NavigationManager
+@inject AuthService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="app-container">
+    <div class="sidebar">
+        <div class="p-3">
+            <h4 class="text-white mb-4">RentFlow</h4>
+            @if (Role == "Admin")
+            {
+                <AdminNavMenu />
+            }
+            else if (Role == "Landlord")
+            {
+                <LandlordNavMenu />
+            }
+            else if (Role == "Tenant")
+            {
+                <TenantNavMenu />
+            }
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-header">
+            <h5 class="m-0">@PageTitle</h5>
+            <div class="ms-auto d-flex align-items-center">
+                @if (Role == "Landlord" || Role == "Tenant")
+                {
+                    <button class="btn btn-link p-0 me-3 position-relative text-amber" @onclick="ToggleWeatherAlerts">
+                        <i class="bi bi-bell-fill fs-5"></i>
+                        @if (HasUnreadAlerts)
+                        {
+                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                <span class="visually-hidden">New alerts</span>
+                            </span>
+                        }
+                    </button>
+                }
+                
+                <span class="me-3">@UserName</span>
+                <button class="btn btn-sm btn-outline-danger" @onclick="Logout">Logout</button>
+            </div>
+        </div>
+
+        @if (ShowWeatherAlerts)
+        {
+            <WeatherAlertBanner OnDismiss="() => ShowWeatherAlerts = false" />
+        }
+
+        <div class="p-4" style="flex-grow: 1; overflow-y: auto;">
+            @Body
+        </div>
+    </div>
+</div>
+
+<ToastContainer />
+
+@code {
+    public string Role { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string PageTitle { get; set; } = "Dashboard";
+    public bool ShowWeatherAlerts { get; set; }
+    public bool HasUnreadAlerts { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity != null && user.Identity.IsAuthenticated)
+        {
+            Role = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Role)?.Value ?? "";
+            UserName = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Name)?.Value ?? "";
+        }
+    }
+
+    private void ToggleWeatherAlerts()
+    {
+        ShowWeatherAlerts = !ShowWeatherAlerts;
+        HasUnreadAlerts = false; // Mark as read locally for now
+    }
+
+    private async Task Logout()
+    {
+        await AuthService.Logout();
+        NavigationManager.NavigateTo("/login");
+    }
+}

@@ -1,0 +1,91 @@
+@page "/admin/tenants"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminService AdminService
+
+<PageTitle>Manage Tenants</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Manage Tenants</h2>
+    <div class="input-group" style="max-width: 300px;">
+        <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+        <input type="text" class="form-control" placeholder="Search tenants..." @bind="searchTerm" @bind:event="oninput">
+    </div>
+</div>
+
+@if (tenants == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="form-card">
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Unit</th>
+                        <th>Landlord</th>
+                        <th>Payment Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var tenant in FilteredTenants)
+                    {
+                        <tr>
+                            <td>@tenant.FullName</td>
+                            <td>@tenant.Email</td>
+                            <td>@tenant.Unit</td>
+                            <td>@tenant.Landlord</td>
+                            <td>
+                                @if (tenant.PaymentStatus == "Paid")
+                                {
+                                    <span class="badge-paid">Paid</span>
+                                }
+                                else if (tenant.PaymentStatus == "Pending")
+                                {
+                                    <span class="badge-pending">Pending</span>
+                                }
+                                else if (tenant.PaymentStatus == "Late")
+                                {
+                                    <span class="badge-late">Late</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">@tenant.PaymentStatus</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-navy">View</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredTenants.Any())
+                    {
+                        <tr>
+                            <td colspan="6" class="text-center py-4">No tenants found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TenantView>? tenants;
+    private string searchTerm = "";
+
+    private IEnumerable<TenantView> FilteredTenants => tenants?.Where(t => 
+        string.IsNullOrWhiteSpace(searchTerm) || 
+        t.FullName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) || 
+        t.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) ?? Array.Empty<TenantView>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        tenants = await AdminService.GetTenants();
+    }
+}

@@ -1,0 +1,64 @@
+@page "/tenant/unit"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Tenant")]
+
+<PageTitle>My Unit</PageTitle>
+
+<h2 class="mb-4">My Unit Details</h2>
+
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="form-card h-100">
+            <h4 class="mb-4">Lease Information</h4>
+            <table class="table">
+                <tbody>
+                    <tr>
+                        <th class="text-muted" style="width: 40%;">Property</th>
+                        <td>Gulberg Heights</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Unit Number</th>
+                        <td>101</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Monthly Rent</th>
+                        <td>Rs 50,000</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Lease Start</th>
+                        <td>Jan 01, 2024</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Lease Status</th>
+                        <td><span class="badge-paid">Active</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="form-card h-100">
+            <h4 class="mb-4">Landlord Contact</h4>
+            <div class="d-flex align-items-center mb-4">
+                <div class="bg-navy text-white rounded-circle d-flex justify-content-center align-items-center me-3" style="width: 60px; height: 60px; font-size: 24px;">
+                    AR
+                </div>
+                <div>
+                    <h5 class="mb-1">Ahmed Raza</h5>
+                    <div class="text-muted">Property Manager</div>
+                </div>
+            </div>
+            
+            <p><i class="bi bi-envelope text-muted me-2"></i> ahmed.landlord@rentflow.io</p>
+            <p><i class="bi bi-telephone text-muted me-2"></i> +92 300 1234567</p>
+            
+            <button class="btn btn-outline-navy w-100 mt-3"><i class="bi bi-chat-dots me-2"></i>Send Message</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    // This is mostly static/mocked for the TenantUnit page as per spec constraints, 
+    // real data would require a specific API endpoint.
+}

@@ -1,0 +1,48 @@
+@inject ToastService ToastService
+@implements IDisposable
+
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
+    @foreach (var toast in ToastService.Toasts)
+    {
+        <div class="toast show mb-2 @GetBorderClass(toast.Type)" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <strong class="me-auto @GetTextClass(toast.Type)">@toast.Title</strong>
+                <small>Just now</small>
+                <button type="button" class="btn-close" @onclick="() => ToastService.RemoveToast(toast)"></button>
+            </div>
+            <div class="toast-body">
+                @toast.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized()
+    {
+        ToastService.OnToastsUpdated += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ToastService.OnToastsUpdated -= StateHasChanged;
+    }
+
+    private string GetBorderClass(string type) => type switch
+    {
+        "Success" => "border-start border-4 border-success",
+        "Error" => "border-start border-4 border-danger",
+        "Warning" => "border-start border-4 border-warning",
+        "Info" => "border-start border-4 border-info",
+        _ => "border-start border-4 border-primary"
+    };
+
+    private string GetTextClass(string type) => type switch
+    {
+        "Success" => "text-success",
+        "Error" => "text-danger",
+        "Warning" => "text-warning",
+        "Info" => "text-info",
+        _ => "text-primary"
+    };
+}

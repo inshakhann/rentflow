@@ -1,0 +1,128 @@
+@page "/admin/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject AdminService AdminService
+
+<PageTitle>Admin Dashboard</PageTitle>
+
+@if (stats == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Total Landlords</div>
+                        <div class="stat-value">@stats.TotalLandlords</div>
+                    </div>
+                    <div class="p-3 bg-teal-light rounded-circle text-teal">
+                        <i class="bi bi-people-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-navy)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Total Tenants</div>
+                        <div class="stat-value">@stats.TotalTenants</div>
+                    </div>
+                    <div class="p-3 bg-light rounded-circle text-navy">
+                        <i class="bi bi-person-badge-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-green)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Active Leases</div>
+                        <div class="stat-value">@stats.ActiveLeases</div>
+                    </div>
+                    <div class="p-3 bg-green-light rounded-circle text-green">
+                        <i class="bi bi-file-earmark-check-fill fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-amber)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Open Tickets</div>
+                        <div class="stat-value">@stats.OpenTickets</div>
+                    </div>
+                    <div class="p-3 bg-amber-light rounded-circle text-amber">
+                        <i class="bi bi-tools fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="form-card h-100">
+                <h3 class="mb-3">Recent Activity</h3>
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>User</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var activity in stats.RecentActivity)
+                            {
+                                <tr>
+                                    <td><span class="badge bg-teal-light text-teal">@activity.Event</span></td>
+                                    <td>@activity.User</td>
+                                    <td>@activity.Time.ToString("MMM dd, yyyy HH:mm")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="form-card h-100">
+                <h3 class="mb-3">Tickets by Category</h3>
+                <div style="height: 300px;">
+                    <canvas id="ticketsChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private DashboardStats? stats;
+    
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        stats = await AdminService.GetDashboardStats();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (stats != null && stats.TicketsByCategory.Count > 0)
+        {
+            var labels = stats.TicketsByCategory.Select(t => t.Category).ToArray();
+            var data = stats.TicketsByCategory.Select(t => t.Count).ToArray();
+            
+            // Reusing donut chart logic, or we can use bar
+            await JSRuntime.InvokeVoidAsync("renderDonutChart", "ticketsChart", labels, data);
+        }
+    }
+}

@@ -1,0 +1,6 @@
+@RentFlow.Server_HostAddress = http://localhost:5131
+
+GET {{RentFlow.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

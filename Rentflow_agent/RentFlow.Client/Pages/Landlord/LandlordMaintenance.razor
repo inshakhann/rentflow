@@ -1,0 +1,100 @@
+@page "/landlord/maintenance"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Landlord")]
+@inject MaintenanceService MaintenanceService
+
+<PageTitle>Maintenance Tickets</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Maintenance Requests</h2>
+    <div class="btn-group">
+        <button class="btn btn-outline-navy active">All</button>
+        <button class="btn btn-outline-navy">Open</button>
+        <button class="btn btn-outline-navy">Resolved</button>
+    </div>
+</div>
+
+@if (tickets == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="form-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Date</th>
+                        <th>Property/Tenant</th>
+                        <th>Category</th>
+                        <th>Urgency</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var ticket in tickets)
+                    {
+                        <tr>
+                            <td>#@ticket.Id</td>
+                            <td>@ticket.CreatedAt.ToString("MMM dd, yyyy")</td>
+                            <td>
+                                <div><strong>@ticket.PropertyName</strong></div>
+                                <div class="small text-muted">@ticket.TenantName</div>
+                            </td>
+                            <td>@ticket.Category</td>
+                            <td>
+                                @if (ticket.Urgency == 3)
+                                {
+                                    <span class="badge bg-danger">Emergency</span>
+                                }
+                                else if (ticket.Urgency == 2)
+                                {
+                                    <span class="badge bg-warning text-dark">Moderate</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-info">Minor</span>
+                                }
+                            </td>
+                            <td>
+                                @if (ticket.Status == "Open")
+                                {
+                                    <span class="badge-pending">Open</span>
+                                }
+                                else if (ticket.Status == "InProgress")
+                                {
+                                    <span class="badge bg-primary">In Progress</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-paid">Resolved</span>
+                                }
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-navy">Details</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!tickets.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4">No maintenance tickets found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<LandlordTicketView>? tickets;
+
+    protected override async Task OnInitializedAsync()
+    {
+        tickets = await MaintenanceService.GetLandlordTickets();
+    }
+}

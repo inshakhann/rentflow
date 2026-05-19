@@ -1,0 +1,54 @@
+@page "/admin/settings"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Admin")]
+@inject ToastService ToastService
+
+<PageTitle>System Settings</PageTitle>
+
+<h2 class="mb-4">System Settings</h2>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="form-card">
+            <h4 class="mb-4 text-navy">Late Fee Configuration</h4>
+            <div class="mb-3">
+                <label class="form-label text-muted">Late Fee Percentage (%)</label>
+                <input type="number" class="form-control" @bind="lateFeePercent" min="1" max="100">
+                <small class="text-muted">Applied to base rent amount</small>
+            </div>
+            
+            <div class="mb-4">
+                <label class="form-label text-muted">Fee Trigger Day of Month</label>
+                <input type="number" class="form-control" @bind="triggerDay" min="1" max="28">
+                <small class="text-muted">e.g. '5' means fee is applied on the 5th of every month</small>
+            </div>
+            
+            <hr class="my-4">
+            
+            <h4 class="mb-4 text-navy">Weather Alert Polling</h4>
+            <div class="mb-4">
+                <label class="form-label text-muted">Check Interval (Hours)</label>
+                <input type="number" class="form-control" @bind="weatherInterval" min="1" max="24">
+            </div>
+
+            <button class="btn btn-primary" @onclick="SaveSettings">
+                <i class="bi bi-save me-2"></i> Save Settings
+            </button>
+            <button class="btn btn-outline-amber ms-2">
+                <i class="bi bi-cloud-download me-2"></i> Trigger Weather Check Now
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int lateFeePercent = 5;
+    private int triggerDay = 5;
+    private int weatherInterval = 6;
+
+    private void SaveSettings()
+    {
+        // In a real app, these would be saved to a database table or appsettings
+        ToastService.ShowSuccess("Settings saved successfully.");
+    }
+}

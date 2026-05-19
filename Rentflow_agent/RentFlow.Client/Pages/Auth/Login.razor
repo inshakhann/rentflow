@@ -1,0 +1,78 @@
+@page "/login"
+@using RentFlow.Shared.DTOs
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+
+<div class="d-flex align-items-center justify-content-center" style="min-height: 100vh; background-color: var(--color-navy);">
+    <div class="form-card" style="width: 100%; max-width: 480px;">
+        <div class="text-center mb-4">
+            <h1 class="h2 text-navy mb-1">RentFlow</h1>
+            <p class="text-muted">Intelligent Property Management</p>
+        </div>
+
+        @if (ShowError)
+        {
+            <div class="alert alert-danger p-2 mb-4">
+                Invalid credentials. Please try again.
+            </div>
+        }
+
+        <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            
+            <div class="mb-3">
+                <label class="form-label text-muted">Email</label>
+                <InputText @bind-Value="loginModel.Email" class="form-control" placeholder="you@example.com" type="email" required />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label text-muted">Password</label>
+                <InputText @bind-Value="loginModel.Password" class="form-control" type="password" required />
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100" style="height: 44px;" disabled="@IsLoading">
+                @if (IsLoading)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                else
+                {
+                    <span>Sign In</span>
+                }
+            </button>
+            
+            <div class="text-center mt-4">
+                <a href="/register" class="text-decoration-none" style="color: var(--color-teal);">Don't have an account? Register here</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private LoginDto loginModel = new();
+    private bool IsLoading = false;
+    private bool ShowError = false;
+
+    private async Task HandleLogin()
+    {
+        IsLoading = true;
+        ShowError = false;
+        
+        var role = await AuthService.Login(loginModel);
+        
+        if (role != null)
+        {
+            ToastService.ShowSuccess("Login successful!");
+            
+            if (role == "Admin") NavigationManager.NavigateTo("/admin/dashboard");
+            else if (role == "Landlord") NavigationManager.NavigateTo("/landlord/dashboard");
+            else NavigationManager.NavigateTo("/tenant/dashboard");
+        }
+        else
+        {
+            ShowError = true;
+            IsLoading = false;
+        }
+    }
+}

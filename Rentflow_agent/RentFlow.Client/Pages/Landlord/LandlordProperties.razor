@@ -1,0 +1,70 @@
+@page "/landlord/properties"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject NavigationManager NavigationManager
+
+<PageTitle>My Properties</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>My Properties</h2>
+    <button class="btn btn-primary" @onclick='() => NavigationManager.NavigateTo("/landlord/properties/add")'>
+        <i class="bi bi-plus-lg me-2"></i>Add Property
+    </button>
+</div>
+
+@if (properties == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="row">
+        @foreach (var prop in properties)
+        {
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card form-card h-100 cursor-pointer" @onclick="() => ViewProperty(prop.Id)">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <h4 class="card-title text-navy mb-0">@prop.Name</h4>
+                            <span class="badge bg-teal-light text-teal">@prop.TotalUnits Units</span>
+                        </div>
+                        <p class="text-muted mb-4"><i class="bi bi-geo-alt me-2"></i>@prop.Address, @prop.City</p>
+                        
+                        <div class="mb-2 d-flex justify-content-between small">
+                            <span>Occupancy</span>
+                            <span class="fw-bold">@(Math.Round(prop.OccupancyPercent))%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-teal" role="progressbar" style="width: @prop.OccupancyPercent%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        
+        @if (!properties.Any())
+        {
+            <div class="col-12 text-center py-5">
+                <div class="text-muted mb-3"><i class="bi bi-building fs-1"></i></div>
+                <h5>No properties yet</h5>
+                <p class="text-muted">Add your first property to get started.</p>
+                <button class="btn btn-primary mt-2">Add Property</button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<PropertyView>? properties;
+
+    protected override async Task OnInitializedAsync()
+    {
+        properties = await PropertyService.GetProperties();
+    }
+
+    private void ViewProperty(int id)
+    {
+        NavigationManager.NavigateTo($"/landlord/properties/{id}");
+    }
+}

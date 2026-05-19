@@ -1,0 +1,149 @@
+@page "/landlord/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Landlord")]
+@inject PropertyService PropertyService
+@inject PaymentService PaymentService
+@inject MaintenanceService MaintenanceService
+
+<PageTitle>Landlord Dashboard</PageTitle>
+
+@if (isLoading)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Properties</div>
+                        <div class="stat-value">@properties?.Count</div>
+                    </div>
+                    <div class="p-3 bg-teal-light rounded-circle text-teal">
+                        <i class="bi bi-building fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-green)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Revenue (YTD)</div>
+                        <div class="stat-value">Rs @(revenue?.Sum(r => r.Total).ToString("N0") ?? "0")</div>
+                    </div>
+                    <div class="p-3 bg-green-light rounded-circle text-green">
+                        <i class="bi bi-currency-dollar fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-amber)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Open Tickets</div>
+                        <div class="stat-value">@tickets?.Count(t => t.Status == "Open")</div>
+                    </div>
+                    <div class="p-3 bg-amber-light rounded-circle text-amber">
+                        <i class="bi bi-tools fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-3 col-md-6 col-12 mb-3">
+            <div class="stat-card" style="border-left-color: var(--color-danger)">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="card-title">Late Payments</div>
+                        <div class="stat-value">@latePayments?.Count</div>
+                    </div>
+                    <div class="p-3 bg-danger bg-opacity-10 rounded-circle text-danger">
+                        <i class="bi bi-exclamation-triangle fs-4"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="form-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">Revenue Overview</h3>
+                    <a href="landlord/revenue" class="btn btn-sm btn-outline-navy">View Details</a>
+                </div>
+                <div style="height: 300px;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 mb-4">
+            <div class="form-card h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">Late Payments</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    @if (latePayments == null || latePayments.Count == 0)
+                    {
+                        <div class="text-center py-4 text-muted">No late payments!</div>
+                    }
+                    else
+                    {
+                        @foreach (var late in latePayments.Take(5))
+                        {
+                            <div class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>@late.TenantName</strong>
+                                        <div class="text-muted small">Unit @late.UnitNumber</div>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="text-danger fw-bold">Rs @(late.Amount + late.LateFee)</div>
+                                        <div class="text-muted small">@late.DaysOverdue days late</div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PropertyView>? properties;
+    private List<RevenueItem>? revenue;
+    private List<LandlordTicketView>? tickets;
+    private List<LatePaymentItem>? latePayments;
+    private bool isLoading = true;
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var tasks = new List<Task>
+        {
+            Task.Run(async () => properties = await PropertyService.GetProperties()),
+            Task.Run(async () => revenue = await PaymentService.GetLandlordRevenue()),
+            Task.Run(async () => tickets = await MaintenanceService.GetLandlordTickets()),
+            Task.Run(async () => latePayments = await PaymentService.GetLatePayments())
+        };
+
+        await Task.WhenAll(tasks);
+        isLoading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!isLoading && revenue != null && revenue.Count > 0)
+        {
+            var labels = revenue.Select(r => r.Label).ToArray();
+            var data = revenue.Select(r => r.Total).ToArray();
+            await JSRuntime.InvokeVoidAsync("renderBarChart", "revenueChart", labels, data);
+        }
+    }
+}

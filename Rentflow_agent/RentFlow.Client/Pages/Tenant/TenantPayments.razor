@@ -1,0 +1,84 @@
+@page "/tenant/payments"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Tenant")]
+@inject PaymentService PaymentService
+
+<PageTitle>Payment History</PageTitle>
+
+<h2 class="mb-4">Payment History</h2>
+
+@if (payments == null)
+{
+    <LoadingSpinner />
+}
+else
+{
+    <div class="form-card">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Due Date</th>
+                        <th>Amount</th>
+                        <th>Late Fee</th>
+                        <th>Total</th>
+                        <th>Status</th>
+                        <th>Paid Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var payment in payments)
+                    {
+                        <tr>
+                            <td>@payment.DueDate.ToString("MMM dd, yyyy")</td>
+                            <td>Rs @payment.Amount.ToString("N0")</td>
+                            <td>Rs @payment.LateFee.ToString("N0")</td>
+                            <td><strong>Rs @((payment.Amount + payment.LateFee).ToString("N0"))</strong></td>
+                            <td>
+                                @if (payment.Status == "Paid")
+                                {
+                                    <span class="badge-paid">Paid</span>
+                                }
+                                else if (payment.Status == "Late")
+                                {
+                                    <span class="badge-late">Late</span>
+                                }
+                                else
+                                {
+                                    <span class="badge-pending">Pending</span>
+                                }
+                            </td>
+                            <td>@(payment.PaidDate?.ToString("MMM dd, yyyy") ?? "-")</td>
+                            <td>
+                                @if (payment.Status != "Paid")
+                                {
+                                    <button class="btn btn-sm btn-primary">Pay Now</button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-sm btn-outline-secondary">Receipt</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (!payments.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center py-4">No payment history found.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TenantPaymentHistory>? payments;
+
+    protected override async Task OnInitializedAsync()
+    {
+        payments = await PaymentService.GetTenantHistory();
+    }
+}
