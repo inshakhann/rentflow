@@ -223,7 +223,7 @@ else
             <div class="text-center mb-5 border-bottom pb-4">
                 <h2>RentFlow Monthly Report</h2>
                 <h4 class="text-muted">@(new DateTime(2020, reportData.Month, 1).ToString("MMMM")) @reportData.Year</h4>
-                <p class="small text-muted">Generated on @DateTime.UtcNow.ToString("MMM dd, yyyy M:mm tt")</p>
+                <p class="small text-muted">Generated on @DateTime.UtcNow.ToString("MMM dd, yyyy h:mm tt")</p>
             </div>
             <div class="row mb-5">
                 <div class="col-6">

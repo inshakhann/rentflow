@@ -55,7 +55,7 @@ else
                                     <span class="badge bg-teal rounded-pill px-3 py-1 text-white"><i class="bi bi-hourglass-split me-1 small"></i>Pending</span>
                                 }
                             </td>
-                            <td>@(payment.PaidDate?.ToString("MMM dd, yyyy M:mm tt") ?? "-")</td>
+                            <td>@(payment.PaidDate?.ToString("MMM dd, yyyy h:mm tt") ?? "-")</td>
                             <td class="pe-3 text-end">
                                 @if (payment.Status != "Paid")
                                 {
@@ -157,7 +157,7 @@ else
             </tfoot>
         </table>
         <div class="text-center mt-5">
-            <p>Paid on @(receipt.PaidDate?.ToString("MMM dd, yyyy M:mm tt"))</p>
+            <p>Paid on @(receipt.PaidDate?.ToString("MMM dd, yyyy h:mm tt"))</p>
             <p class="small text-muted">Thank you for your prompt payment.</p>
         </div>
     </div>
